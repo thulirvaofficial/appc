@@ -133,6 +133,8 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
       return false;
     }
   }
+  Future<bool> pauseSubscription(String subId) => updateStatus(subId, 'paused');
+  Future<bool> resumeSubscription(String subId) => updateStatus(subId, 'active');
 }
 
 final subscriptionProvider = StateNotifierProvider<SubscriptionNotifier, SubscriptionState>((ref) {

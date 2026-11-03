@@ -13,10 +13,13 @@ class SubscriptionPlanModel {
   final String badge;
   final String status;
 
+  String get name => productName;
+
   SubscriptionPlanModel({
     required this.id,
     this.productId,
-    required this.productName,
+    String? productName,
+    String? name,
     this.productImage,
     required this.timePeriod,
     this.frequency = 'Daily',
@@ -24,10 +27,10 @@ class SubscriptionPlanModel {
     required this.price,
     this.originalPrice,
     this.discountPercent = 0,
-    required this.description,
+    this.description = '',
     this.badge = 'Popular',
     this.status = 'active',
-  });
+  }) : productName = productName ?? name ?? 'Farm Fresh Product';
 
   factory SubscriptionPlanModel.fromJson(Map<String, dynamic> json) {
     return SubscriptionPlanModel(
@@ -69,6 +72,8 @@ class SubscriptionModel {
   final String status;
   final String? transactionId;
   final String? paymentProof;
+
+  double get totalAmount => totalPrice;
 
   SubscriptionModel({
     required this.id,

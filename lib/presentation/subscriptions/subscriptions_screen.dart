@@ -1,308 +1,820 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_dimensions.dart';
-import '../../core/constants/app_typography.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/subscription_provider.dart';
-import '../widgets/empty_state_view.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/thulirva_app_bar.dart';
 import 'subscribe_modal.dart';
 
-class SubscriptionsScreen extends ConsumerWidget {
-  const SubscriptionsScreen({super.key});
+class SubscriptionsScreen extends ConsumerStatefulWidget {
+  final void Function(int tabIndex)? onNavigateToTab;
 
-  void _openSubscribeModal(BuildContext context) {
+  const SubscriptionsScreen({super.key, this.onNavigateToTab});
+
+  @override
+  ConsumerState<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
+}
+
+class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
+  int _selectedTabIndex = 0; // 0: Subscriptions (Plans), 1: My Subscriptions
+
+  // Dropdown states for each plan card
+  String _dailyQty = '500 ml / day';
+  String _weeklyQty = '1 Litre / day';
+  String _monthlyQty = '1 Litre / day';
+
+  void _openSubscribeModal({String planType = 'daily', String quantity = '500 ml / day', double price = 599}) {
+    final subState = ref.read(subscriptionProvider);
+    SubscriptionPlanModel? matchedPlan;
+
+    if (subState.plans.isNotEmpty) {
+      for (final p in subState.plans) {
+        if (p.frequency.toLowerCase().contains(planType.toLowerCase()) ||
+            p.productName.toLowerCase().contains(planType.toLowerCase())) {
+          matchedPlan = p;
+          break;
+        }
+      }
+      matchedPlan ??= subState.plans.first;
+    } else {
+      matchedPlan = SubscriptionPlanModel(
+        id: 'plan_$planType',
+        productName: planType == 'daily'
+            ? 'Daily Milk Plan'
+            : (planType == 'weekly' ? 'Weekly Plan' : 'Monthly Plan'),
+        price: price,
+        frequency: planType,
+        timePeriod: 'Morning (6:00 AM - 7:00 AM)',
+        description: 'Pure A2 fresh farm milk',
+      );
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const SubscribeModal(),
+      builder: (_) => SubscribeModal(initialPlan: matchedPlan),
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final subState = ref.watch(subscriptionProvider);
     final subs = subState.subscriptions;
 
     return Scaffold(
-      backgroundColor: AppColors.lightCream,
-      appBar: AppBar(
-        title: Text('My Subscriptions', style: AppTypography.displaySmall.copyWith(fontSize: 18)),
-        backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFAF7EE),
+      appBar: ThulirvaAppBar(
+        showBack: Navigator.canPop(context),
+        showSearch: false,
+        showNotifications: true,
+        showCart: true,
       ),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.forestGreen,
-          onRefresh: () => ref.read(subscriptionProvider.notifier).fetchSubscriptions(),
-          child: subState.isLoading && subs.isEmpty
-              ? const LoadingIndicator(message: 'Loading active subscriptions...')
-              : subs.isEmpty
-                  ? EmptyStateView(
-                      title: 'No Active Subscriptions',
-                      message: 'Subscribe for daily doorstep fresh milk, paneer, and ghee delivery every morning.',
-                      emoji: '🥛',
-                      buttonText: 'Start Subscription',
-                      onButtonPressed: () => _openSubscribeModal(context),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
+          onRefresh: () async {
+            await Future.wait([
+              ref.read(subscriptionProvider.notifier).fetchPlans(),
+              ref.read(subscriptionProvider.notifier).fetchSubscriptions(),
+            ]);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Subscription Hero Banner Card (Clean background without duplicate text)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Container(
+                    width: double.infinity,
+                    height: 175,
+                    decoration: BoxDecoration(
+                      color: AppColors.forestGreen,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.forestGreen.withValues(alpha: 0.16),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
                       children: [
-                        // Start new subscription banner button
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.forestGreen,
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                        // Clean Background (milk bottle, glass on wooden table on right, green gradient on left)
+                        Positioned.fill(
+                          child: Image.asset(
+                            'assets/images/subscription_clean_bg.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
                           ),
-                          child: Row(
+                        ),
+
+                        // Banner Content (Rendered EXACTLY ONCE via Flutter Widgets)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Colors.white,
-                                child: Text('🥛', style: TextStyle(fontSize: 22)),
+                              Row(
+                                children: const [
+                                  Icon(Icons.calendar_month, color: Color(0xFFE5C97A), size: 22),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Milk\nSubscription',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Daily Morning Milk',
-                                      style: AppTypography.titleMedium.copyWith(color: Colors.white),
-                                    ),
-                                    const Text(
-                                      'Delivered before 7:00 AM every day.',
-                                      style: TextStyle(color: AppColors.lightGold, fontSize: 11.5),
-                                    ),
-                                  ],
+                              const SizedBox(height: 6),
+                              const SizedBox(
+                                width: 200,
+                                child: Text(
+                                  'Get fresh milk & dairy, delivered daily at your doorstep',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    height: 1.25,
+                                  ),
                                 ),
                               ),
-                              ElevatedButton(
-                                onPressed: () => _openSubscribeModal(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.lightGold,
-                                  foregroundColor: AppColors.forestGreen,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                ),
-                                child: const Text('+ Subscribe', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  _buildFeaturePill(Icons.eco, 'Daily Delivery'),
+                                  const SizedBox(width: 6),
+                                  _buildFeaturePill(Icons.calendar_today, 'Flexible Plans'),
+                                  const SizedBox(width: 6),
+                                  _buildFeaturePill(Icons.percent, 'Save More'),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 18),
-
-                        Text(
-                          'Your Subscriptions (${subs.length})',
-                          style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 12),
-
-                        ...subs.map((s) => _buildSubscriptionCard(context, ref, s)),
                       ],
                     ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSubscriptionCard(BuildContext context, WidgetRef ref, SubscriptionModel sub) {
-    final isActive = sub.status.toLowerCase() == 'active';
-    final isPaused = sub.status.toLowerCase() == 'paused';
-    final isCancelled = sub.status.toLowerCase() == 'cancelled';
-
-    // Critical Rule 16: Highlight if 0 <= days_remaining <= 5
-    final isExpiringSoon = sub.daysRemaining >= 0 && sub.daysRemaining <= 5 && isActive;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border: Border.all(
-          color: isExpiringSoon ? AppColors.processing : AppColors.border,
-          width: isExpiringSoon ? 1.8 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.forestGreen.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Header with ID & Status
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '#${sub.id}',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.forestGreen,
-                    fontSize: 14,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.lightGreenBg
-                        : (isPaused ? Colors.amber.shade50 : Colors.red.shade50),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    sub.status.toUpperCase(),
-                    style: TextStyle(
-                      color: isActive
-                          ? AppColors.naturalGreen
-                          : (isPaused ? AppColors.processing : AppColors.cancelled),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
+                const SizedBox(height: 10),
 
-          // Details
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: AppColors.lightCream,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(child: Text('🥛', style: TextStyle(fontSize: 28))),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(sub.productName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                          const SizedBox(height: 2),
-                          Text('${sub.quantity} Packet(s) • ${sub.frequency}', style: AppTypography.bodySmall),
-                          const SizedBox(height: 2),
-                          Text('⏰ Delivery Slot: ${sub.deliverySlot}', style: const TextStyle(fontSize: 11.5, color: AppColors.textMid, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Critical Rule 16: Expiry Reminder Banner
-                if (isExpiringSoon) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                // 2. Segmented Pill Control: [ Subscriptions ] vs [ My Subscriptions ]
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade300),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: const Color(0xFFE5EDE2)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.timer_outlined, color: AppColors.processing, size: 18),
-                        const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            sub.daysRemaining == 0
-                                ? '⚠️ Subscription expires today! Renew now.'
-                                : '⚠️ Subscription expires in ${sub.daysRemaining} days (${sub.expiryDate}).',
-                            style: const TextStyle(
-                              color: Color(0xFF8A5A00),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11.5,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedTabIndex = 0),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _selectedTabIndex == 0 ? AppColors.forestGreen : Colors.transparent,
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 15,
+                                    color: _selectedTabIndex == 0 ? Colors.white : AppColors.forestGreen,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Subscriptions',
+                                    style: TextStyle(
+                                      color: _selectedTabIndex == 0 ? Colors.white : AppColors.forestGreen,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedTabIndex = 1),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _selectedTabIndex == 1 ? AppColors.forestGreen : Colors.transparent,
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.list_alt,
+                                    size: 15,
+                                    color: _selectedTabIndex == 1 ? Colors.white : AppColors.forestGreen,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'My Subscriptions',
+                                    style: TextStyle(
+                                      color: _selectedTabIndex == 1 ? Colors.white : AppColors.forestGreen,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
+                ),
+                const SizedBox(height: 16),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Started: ${sub.startDate}', style: AppTypography.bodySmall),
-                    Text('₹${sub.totalPrice.toStringAsFixed(0)} / mo', style: AppTypography.price.copyWith(fontSize: 16)),
-                  ],
+                // 3. Tab Body
+                if (_selectedTabIndex == 0)
+                  _buildPlansView()
+                else
+                  _buildMySubscriptionsView(subs, subState.isLoading),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturePill(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: const Color(0xFFE5C97A)),
+          const SizedBox(width: 3),
+          Text(
+            text,
+            style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Browse Subscription Plans
+  Widget _buildPlansView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Title & Subtitle
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.eco, color: AppColors.forestGreen, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Choose a Subscription Plan',
+                    style: TextStyle(
+                      color: AppColors.forestGreen,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              const Text(
+                'Select a plan that fits your daily needs',
+                style: TextStyle(
+                  color: Color(0xFF6E8072),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Responsive Horizontal Scrollable List of Plan Cards
+        SizedBox(
+          height: 360,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              // 1. Daily Milk Plan (Most Popular)
+              _buildPlanCard(
+                isMostPopular: true,
+                asset: 'assets/images/sub_daily_glass.png',
+                title: 'Daily Milk Plan',
+                subtitle: 'Fresh milk, delivered every day',
+                selectedQty: _dailyQty,
+                qtyOptions: ['500 ml / day', '1 Litre / day', '2 Litre / day'],
+                price: _dailyQty == '500 ml / day' ? '₹599' : (_dailyQty == '1 Litre / day' ? '₹1,190' : '₹2,350'),
+                onQtyChanged: (val) => setState(() => _dailyQty = val),
+                onSubscribe: () => _openSubscribeModal(
+                  planType: 'daily',
+                  quantity: _dailyQty,
+                  price: _dailyQty == '500 ml / day' ? 599 : (_dailyQty == '1 Litre / day' ? 1190 : 2350),
+                ),
+              ),
+              const SizedBox(width: 14),
+
+              // 2. Weekly Plan
+              _buildPlanCard(
+                isMostPopular: false,
+                asset: 'assets/images/sub_weekly_bottles.png',
+                title: 'Weekly Plan',
+                subtitle: 'Convenient & flexible delivery',
+                selectedQty: _weeklyQty,
+                qtyOptions: ['1 Litre / day', '500 ml / day', '2 Litre / day'],
+                price: _weeklyQty == '1 Litre / day' ? '₹1,699' : (_weeklyQty == '500 ml / day' ? '₹899' : '₹3,299'),
+                onQtyChanged: (val) => setState(() => _weeklyQty = val),
+                onSubscribe: () => _openSubscribeModal(
+                  planType: 'weekly',
+                  quantity: _weeklyQty,
+                  price: _weeklyQty == '1 Litre / day' ? 1699 : (_weeklyQty == '500 ml / day' ? 899 : 3299),
+                ),
+              ),
+              const SizedBox(width: 14),
+
+              // 3. Monthly Plan
+              _buildPlanCard(
+                isMostPopular: false,
+                asset: 'assets/images/sub_monthly_can.png',
+                title: 'Monthly Plan',
+                subtitle: 'Best value for regular customers',
+                selectedQty: _monthlyQty,
+                qtyOptions: ['1 Litre / day', '500 ml / day', '2 Litre / day'],
+                price: _monthlyQty == '1 Litre / day' ? '₹6,499' : (_monthlyQty == '500 ml / day' ? '₹3,499' : '₹12,499'),
+                onQtyChanged: (val) => setState(() => _monthlyQty = val),
+                onSubscribe: () => _openSubscribeModal(
+                  planType: 'monthly',
+                  quantity: _monthlyQty,
+                  price: _monthlyQty == '1 Litre / day' ? 6499 : (_monthlyQty == '500 ml / day' ? 3499 : 12499),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Why Subscribe? Benefits Banner
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDF7EB),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFC8E6C9), width: 1.2),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.savings_outlined, color: AppColors.forestGreen, size: 24),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Why Subscribe?',
+                        style: TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 2,
+                        children: const [
+                          Text('✓ Fresh & hygienic', style: TextStyle(fontSize: 11, color: Color(0xFF3B5B44))),
+                          Text('✓ Delivered on time', style: TextStyle(fontSize: 11, color: Color(0xFF3B5B44))),
+                          Text('✓ Cancel or modify anytime', style: TextStyle(fontSize: 11, color: Color(0xFF3B5B44))),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-
-          // Actions
-          if (!isCancelled) ...[
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton.icon(
-                    icon: Icon(isActive ? Icons.pause_circle_outline : Icons.play_circle_outline, size: 18),
-                    label: Text(isActive ? 'Pause' : 'Resume'),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.forestGreen),
-                    onPressed: () {
-                      ref.read(subscriptionProvider.notifier).updateStatus(sub.id, isActive ? 'Paused' : 'Active');
-                    },
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.cancel_outlined, size: 18),
-                    label: const Text('Cancel'),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.cancelled),
-                    onPressed: () {
-                      _showCancelDialog(context, ref, sub.id);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  void _showCancelDialog(BuildContext context, WidgetRef ref, String subId) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Cancel Subscription?'),
-        content: const Text('Are you sure you want to cancel this morning dairy delivery subscription?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Keep Active')),
-          TextButton(
-            onPressed: () {
-              ref.read(subscriptionProvider.notifier).updateStatus(subId, 'Cancelled');
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel Subscription', style: TextStyle(color: AppColors.cancelled)),
+  Widget _buildPlanCard({
+    required bool isMostPopular,
+    required String asset,
+    required String title,
+    required String subtitle,
+    required String selectedQty,
+    required List<String> qtyOptions,
+    required String price,
+    required ValueChanged<String> onQtyChanged,
+    required VoidCallback onSubscribe,
+  }) {
+    return Container(
+      width: 235,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isMostPopular ? AppColors.forestGreen : const Color(0xFFE5EDE2),
+          width: isMostPopular ? 1.8 : 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top image container with Most Popular pill
+          Container(
+            height: 125,
+            width: double.infinity,
+            color: const Color(0xFFFAF7EE),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    asset,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.local_drink, color: AppColors.forestGreen, size: 40),
+                    ),
+                  ),
+                ),
+                if (isMostPopular)
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.forestGreen,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Most Popular',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.forestGreen,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF6E8072),
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+
+                // Quantity Dropdown
+                Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7FAF5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFDCE8D8)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: selectedQty,
+                      isExpanded: true,
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.forestGreen),
+                      items: qtyOptions.map((opt) {
+                        return DropdownMenuItem<String>(
+                          value: opt,
+                          child: Text(
+                            opt,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) onQtyChanged(val);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Price Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      price,
+                      style: const TextStyle(
+                        color: AppColors.forestGreen,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Text(
+                      ' / month',
+                      style: TextStyle(
+                        color: Color(0xFF6E8072),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Subscribe Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton(
+                    onPressed: onSubscribe,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.forestGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Text(
+                          'Subscribe',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-}
 
+  // Active User Subscriptions View
+  Widget _buildMySubscriptionsView(List<SubscriptionModel> subs, bool isLoading) {
+    if (isLoading && subs.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(40.0),
+        child: LoadingIndicator(message: 'Loading your subscriptions...'),
+      );
+    }
+
+    if (subs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 30),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEDF7EB),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(Icons.calendar_month_outlined, size: 44, color: AppColors.forestGreen),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No Active Subscriptions Yet',
+                style: TextStyle(
+                  color: AppColors.forestGreen,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Subscribe to daily fresh milk and have farm goodness delivered to your doorstep every morning.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF6E8072), fontSize: 13),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: () => setState(() => _selectedTabIndex = 0),
+                icon: const Icon(Icons.arrow_back, size: 16),
+                label: const Text('Explore Subscription Plans'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.forestGreen,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: subs.length,
+      itemBuilder: (context, index) {
+        final sub = subs[index];
+        final isActive = sub.status.toLowerCase() == 'active';
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE5EDE2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      sub.productName.isNotEmpty ? sub.productName : 'Fresh Cow Milk',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      sub.status.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isActive ? AppColors.forestGreen : AppColors.pending,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.schedule, size: 14, color: Color(0xFF6E8072)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${sub.frequency} | Qty: ${sub.quantity}',
+                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF6E8072)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '₹${sub.totalPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.forestGreen,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      if (isActive)
+                        OutlinedButton(
+                          onPressed: () async {
+                            await ref.read(subscriptionProvider.notifier).pauseSubscription(sub.id);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.pending,
+                            side: const BorderSide(color: AppColors.pending),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          ),
+                          child: const Text('Pause', style: TextStyle(fontSize: 12)),
+                        )
+                      else
+                        ElevatedButton(
+                          onPressed: () async {
+                            await ref.read(subscriptionProvider.notifier).resumeSubscription(sub.id);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.forestGreen,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          ),
+                          child: const Text('Resume', style: TextStyle(fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

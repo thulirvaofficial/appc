@@ -7,7 +7,6 @@ import '../../data/models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../cart/cart_screen.dart';
 import '../widgets/quantity_selector.dart';
-import '../widgets/thulirva_button.dart';
 
 class ProductDetailsScreen extends ConsumerStatefulWidget {
   final ProductModel product;
@@ -226,7 +225,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
 
           // Bottom Add to Cart Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               border: const Border(top: BorderSide(color: AppColors.border, width: 1)),
@@ -239,53 +238,64 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
               ],
             ),
             child: SafeArea(
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(cartProvider.notifier).addToCart(
-                          p,
-                          quantity: _quantity,
-                          variant: _selectedVariant,
-                        );
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('✓ ${p.name} added to cart!'),
-                        backgroundColor: AppColors.forestGreen,
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 2),
-                        action: SnackBarAction(
-                          label: 'VIEW CART',
-                          textColor: AppColors.lightGold,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const CartScreen()),
-                            );
-                          },
+              child: Row(
+                children: [
+                  QuantitySelector(
+                    quantity: _quantity,
+                    onQuantityChanged: (val) => setState(() => _quantity = val),
+                    minQuantity: 1,
+                    maxQuantity: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ref.read(cartProvider.notifier).addToCart(
+                                p,
+                                quantity: _quantity,
+                                variant: _selectedVariant,
+                              );
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✓ ${p.name} added to cart!'),
+                              backgroundColor: AppColors.forestGreen,
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                              action: SnackBarAction(
+                                label: 'VIEW CART',
+                                textColor: AppColors.lightGold,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const CartScreen()),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.forestGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Add to Cart',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    );
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.forestGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Add to Cart',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),

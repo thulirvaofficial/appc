@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_dimensions.dart';
-import '../../core/constants/app_typography.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
@@ -13,7 +11,6 @@ import '../../providers/settings_provider.dart';
 import '../cart/cart_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../products/products_list_screen.dart';
-import '../widgets/empty_state_view.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/product_card.dart';
 import 'widgets/category_bubble.dart';
@@ -59,15 +56,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final cartCount = cartState.totalItemCount;
 
     final displayLocation = addressState.selectedAddress?.city != null
-        ? '${addressState.selectedAddress!.city}, Tamil Nadu ${addressState.selectedAddress!.pincode}'
+        ? '${addressState.selectedAddress!.city}, Tamil Nadu'
         : (user?.address != null && user!.address!.isNotEmpty)
             ? user.address!
-            : 'Chennai, Tamil Nadu 600119';
+            : 'Chennai, Tamil Nadu';
 
+    final pincode = addressState.selectedAddress?.pincode ?? '600119';
     final products = productState.featuredProducts;
 
     return Scaffold(
-      backgroundColor: AppColors.lightCream,
+      backgroundColor: const Color(0xFFFAF7EE),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.forestGreen,
@@ -77,19 +75,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Mockup Screen 4: Solid Forest Green Header Container
+                // 1. Top Forest Green Header Container
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   decoration: const BoxDecoration(
                     color: AppColors.forestGreen,
                     borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(24),
-                      bottomRight: Radius.circular(24),
+                      bottomLeft: Radius.circular(26),
+                      bottomRight: Radius.circular(26),
                     ),
                   ),
                   child: Column(
                     children: [
-                      // Location Pin & Icons Row
+                      // Header Row: Menu, Location Dropdown, Notifications, Cart
                       Row(
                         children: [
                           IconButton(
@@ -98,24 +96,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                           ),
-                          const SizedBox(width: 10),
-                          const Icon(Icons.location_on_outlined, color: Colors.white, size: 20),
+                          const SizedBox(width: 12),
+                          const Icon(Icons.location_on, color: Color(0xFFE5C97A), size: 20),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Chennai, Tamil Nadu',
-                                  style: AppTypography.titleSmall.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13.5,
-                                    color: Colors.white,
-                                  ),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        displayLocation,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13.5,
+                                          color: Colors.white,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 16),
+                                  ],
                                 ),
-                                const Text(
-                                  '600119',
-                                  style: TextStyle(
+                                Text(
+                                  'PIN: $pincode',
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.white70,
                                     fontWeight: FontWeight.w500,
@@ -124,14 +132,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ],
                             ),
                           ),
-                          // Notification Action Icon
+
+                          // Notification Bell
                           IconButton(
                             icon: Badge(
                               isLabelVisible: notifState.unreadCount > 0,
                               backgroundColor: AppColors.cancelled,
                               label: Text(
                                 '${notifState.unreadCount}',
-                                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700),
+                                style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
                               ),
                               child: const Icon(Icons.notifications_none_outlined, color: Colors.white, size: 22),
                             ),
@@ -142,20 +151,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               );
                             },
                           ),
-                          // Direct Cart Action Icon
+
+                          // Cart Icon
                           IconButton(
                             icon: Badge(
                               isLabelVisible: cartCount > 0,
                               backgroundColor: AppColors.cancelled,
                               label: Text(
                                 '$cartCount',
-                                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700),
+                                style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
                               ),
                               child: const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 22),
                             ),
                             onPressed: () {
                               if (widget.onNavigateToTab != null) {
-                                widget.onNavigateToTab!(2);
+                                widget.onNavigateToTab!(3); // Cart is index 3
                               } else {
                                 Navigator.push(
                                   context,
@@ -168,7 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Rounded White Search Bar Pill
+                      // Pill Search Bar
                       Container(
                         height: 44,
                         decoration: BoxDecoration(
@@ -176,7 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -194,12 +204,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             );
                           },
                           decoration: InputDecoration(
-                            hintText: 'Search for milk, paneer, ghee...',
-                            hintStyle: AppTypography.bodyMedium.copyWith(
-                              color: AppColors.textMuted,
+                            hintText: 'Search fresh milk, paneer, ghee...',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF8A9A7A),
                               fontSize: 13,
                             ),
-                            prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
+                            prefixIcon: const Icon(Icons.search, color: Color(0xFF8A9A7A), size: 20),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, size: 16),
@@ -208,7 +218,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       ref.read(productProvider.notifier).setSearchQuery('');
                                     },
                                   )
-                                : const Icon(Icons.tune, color: AppColors.textMuted, size: 18),
+                                : const Icon(Icons.tune, color: Color(0xFF8A9A7A), size: 18),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
@@ -221,31 +231,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // 2. Body Content on Light Cream Background
+                // 2. Body Content
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Promotional Banner
+                      // Promo Hero Banner
                       PromoBanner(
                         onShopNow: () {
                           widget.onNavigateToTab?.call(1);
                         },
                       ),
+                      const SizedBox(height: 14),
 
+                      // 4-Feature Chips Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildFeatureItem(Icons.schedule, 'Daily\nDelivery'),
+                          _buildFeatureItem(Icons.calendar_month, 'Flexible\nSubscription'),
+                          _buildFeatureItem(Icons.verified_outlined, 'Quality\nAssured'),
+                          _buildFeatureItem(Icons.nature_outlined, 'Farm\nto Home'),
+                        ],
+                      ),
+
+                      // Pickup Only Notice (if active)
                       if (settingsState.isPickupOnly) ...[
                         const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE8F5E9),
-                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFFEDF7EB),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: AppColors.forestGreen, width: 1.5),
                           ),
                           child: Row(
                             children: [
-                              const Text('🏪', style: TextStyle(fontSize: 24)),
+                              const Text('🏪', style: TextStyle(fontSize: 22)),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
@@ -258,7 +281,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     SizedBox(height: 2),
                                     Text(
                                       'Orders are available for Farm Store Pickup (Free). Doorstep delivery is temporarily paused.',
-                                      style: TextStyle(fontSize: 11.5, color: AppColors.textMid),
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF4A5D4E)),
                                     ),
                                   ],
                                 ),
@@ -269,24 +292,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ],
                       const SizedBox(height: 18),
 
-                      // Categories Section (Mockup 4x2 Grid)
+                      // Categories Section (Grid)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
+                          const Text(
                             'Categories',
-                            style: AppTypography.titleLarge.copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 17,
+                            style: TextStyle(
+                              color: AppColors.forestGreen,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              letterSpacing: -0.2,
                             ),
                           ),
                           GestureDetector(
                             onTap: () => widget.onNavigateToTab?.call(1),
-                            child: Text(
-                              'View All',
-                              style: AppTypography.bodySmall.copyWith(
+                            child: const Text(
+                              'View All →',
+                              style: TextStyle(
                                 color: AppColors.forestGreen,
                                 fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -310,8 +336,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           padding: EdgeInsets.symmetric(vertical: 16.0),
                           child: Center(
                             child: Text(
-                              'Categories loading from farm server...',
-                              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                              'Loading farm categories...',
+                              style: TextStyle(color: Color(0xFF6E8072), fontSize: 13),
                             ),
                           ),
                         )
@@ -319,12 +345,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: categoryState.categories.length,
+                          itemCount: categoryState.categories.length > 8 ? 8 : categoryState.categories.length,
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 4,
                             mainAxisSpacing: 10,
                             crossAxisSpacing: 8,
-                            childAspectRatio: 0.78,
+                            childAspectRatio: 0.76,
                           ),
                           itemBuilder: (context, index) {
                             final cat = categoryState.categories[index];
@@ -343,31 +369,110 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       const SizedBox(height: 18),
 
+                      // Subscription Promo Card
+                      GestureDetector(
+                        onTap: () => widget.onNavigateToTab?.call(2), // Switch to Subscription tab
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF1B4332), Color(0xFF2D6B45)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.forestGreen.withValues(alpha: 0.15),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.calendar_month, color: Color(0xFFE5C97A), size: 24),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: const [
+                                    Text(
+                                      'Daily Milk Subscription',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Fresh milk delivered daily to your doorstep',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE5A93C),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Text(
+                                  'Subscribe →',
+                                  style: TextStyle(
+                                    color: AppColors.forestGreen,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
                       // Featured Products Section
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
+                          const Text(
                             'Featured Products',
-                            style: AppTypography.titleLarge.copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 17,
+                            style: TextStyle(
+                              color: AppColors.forestGreen,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              letterSpacing: -0.2,
                             ),
                           ),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ProductsListScreen(),
-                                ),
+                                MaterialPageRoute(builder: (_) => const ProductsListScreen()),
                               );
                             },
-                            child: Text(
-                              'View All',
-                              style: AppTypography.bodySmall.copyWith(
+                            child: const Text(
+                              'View All →',
+                              style: TextStyle(
                                 color: AppColors.forestGreen,
                                 fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
                           ),
@@ -376,32 +481,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SizedBox(height: 12),
 
                       if (productState.isLoading && products.isEmpty)
-                        const SizedBox(height: 200, child: LoadingIndicator(message: 'Loading fresh farm products...'))
+                        const SizedBox(
+                          height: 120,
+                          child: Center(child: LoadingIndicator(message: 'Loading farm products...')),
+                        )
                       else if (products.isEmpty)
-                        const EmptyStateView(
-                          title: 'No Products Found',
-                          message: 'Fresh products are being updated from the farm.',
-                          emoji: '🥛',
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24.0),
+                          child: Center(
+                            child: Text(
+                              'No products available right now.',
+                              style: TextStyle(color: Color(0xFF6E8072), fontSize: 13),
+                            ),
+                          ),
                         )
                       else
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
+                          itemCount: products.length,
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.72,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.68,
                           ),
-                          itemCount: products.length,
                           itemBuilder: (context, index) {
-                            return ProductCard(
-                              product: products[index],
-                              showAddText: true,
-                            );
+                            return ProductCard(product: products[index]);
                           },
                         ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 30),
                     ],
                   ),
                 ),
@@ -412,5 +521,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-}
 
+  Widget _buildFeatureItem(IconData icon, String text) {
+    return Container(
+      width: 78,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5EDE2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.forestGreen, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF3B5B44),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

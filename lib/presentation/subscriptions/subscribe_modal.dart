@@ -11,7 +11,9 @@ import '../widgets/thulirva_button.dart';
 import '../widgets/thulirva_text_field.dart';
 
 class SubscribeModal extends ConsumerStatefulWidget {
-  const SubscribeModal({super.key});
+  final SubscriptionPlanModel? initialPlan;
+
+  const SubscribeModal({super.key, this.initialPlan});
 
   @override
   ConsumerState<SubscribeModal> createState() => _SubscribeModalState();
@@ -24,6 +26,12 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
   String _selectedSlot = '6:00 AM - 7:00 AM';
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   final TextEditingController _utrController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPlan = widget.initialPlan;
+  }
 
   final List<String> _slots = [
     '5:30 AM - 6:30 AM',

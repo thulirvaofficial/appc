@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_typography.dart';
 import '../../data/models/order_model.dart';
 import '../main_wrapper.dart';
 import '../orders/order_details_screen.dart';
-import '../widgets/thulirva_button.dart';
 
 class OrderSuccessScreen extends StatelessWidget {
   final OrderModel order;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_typography.dart';
 import '../../providers/auth_provider.dart';
 import '../main_wrapper.dart';
 
@@ -36,6 +35,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: AppColors.cancelled,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final success = await ref.read(authProvider.notifier).register(
           _nameController.text.trim(),
           _emailController.text.trim(),
@@ -48,7 +58,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✓ Account created successfully! Welcome to THULIRVA.'),
+          content: Text('✓ Welcome to THULIRVA! Account created successfully.'),
           backgroundColor: AppColors.forestGreen,
           behavior: SnackBarBehavior.floating,
         ),
@@ -59,7 +69,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         (route) => false,
       );
     } else {
-      final error = ref.read(authProvider).errorMessage ?? 'Registration failed';
+      final error = ref.read(authProvider).errorMessage ?? 'Registration failed. Please try again.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
@@ -75,245 +85,260 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final authState = ref.watch(authProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFEFBF3),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Top Corner Leaves
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Container(
-                    padding: const EdgeInsets.only(top: 4, right: 4),
-                    child: const Text('🌿', style: TextStyle(fontSize: 28)),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Circular Official Logo Badge
-                Container(
-                  width: 92,
-                  height: 92,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF143823).withValues(alpha: 0.12),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
+      backgroundColor: const Color(0xFFFAF7EE),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // 1. Top Pastoral Farm Artwork Banner
+            Container(
+              width: double.infinity,
+              height: 220,
+              decoration: const BoxDecoration(
+                color: AppColors.forestGreen,
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
                     child: Image.asset(
-                      'assets/images/logo/logo.jpg',
-                      width: 92,
-                      height: 92,
+                      'assets/images/login_hero.png',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child: Text('🌿', style: TextStyle(fontSize: 42)),
+                      errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
+                    ),
+                  ),
+                  // Back button
+                  Positioned(
+                    top: 40,
+                    left: 16,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black.withValues(alpha: 0.3),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                        onPressed: () => Navigator.pop(context),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                // Brand Name
-                Text(
-                  'THULIRVA',
-                  style: AppTypography.displayLarge.copyWith(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.5,
-                    color: const Color(0xFF143823),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '— ROOTED IN NATURE —',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2,
-                    color: Color(0xFF8B6B38),
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Headline (Mockup: "Create Account")
-                const Text(
-                  'Create Account',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                const SizedBox(height: 22),
-
-                // Field 1: Full Name
-                _buildField(
-                  controller: _nameController,
-                  hint: 'Full Name',
-                  icon: Icons.person_outline,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your full name' : null,
-                ),
-                const SizedBox(height: 14),
-
-                // Field 2: Email
-                _buildField(
-                  controller: _emailController,
-                  hint: 'Email',
-                  icon: Icons.mail_outline,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Please enter your email';
-                    if (!v.contains('@')) return 'Please enter a valid email';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // Field 3: Phone Number
-                _buildField(
-                  controller: _phoneController,
-                  hint: 'Phone Number',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your phone number' : null,
-                ),
-                const SizedBox(height: 14),
-
-                // Field 4: Password
-                _buildField(
-                  controller: _passwordController,
-                  hint: 'Password',
-                  icon: Icons.lock_outline,
-                  obscure: _obscurePassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: const Color(0xFF6B7280),
-                      size: 20,
-                    ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                  validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 characters' : null,
-                ),
-                const SizedBox(height: 14),
-
-                // Field 5: Confirm Password
-                _buildField(
-                  controller: _confirmPasswordController,
-                  hint: 'Confirm Password',
-                  icon: Icons.lock_outline,
-                  obscure: _obscureConfirm,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: const Color(0xFF6B7280),
-                      size: 20,
-                    ),
-                    onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                  ),
-                  validator: (v) {
-                    if (v != _passwordController.text) return 'Passwords do not match';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // CTA Button: Register (Mockup dark green button)
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: authState.isLoading ? null : _handleRegister,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF143823),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    child: authState.isLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text(
-                            'Register',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Bottom Login Link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Already have an account? ',
-                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 13.5),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Text(
-                        'Login',
-                        style: TextStyle(
-                          color: Color(0xFF143823),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
+                  // Smooth curve transition
+                  Positioned(
+                    bottom: -1,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFAF7EE),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(28),
+                          topRight: Radius.circular(28),
                         ),
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+
+            // 2. Form Content
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Create Account',
+                      style: TextStyle(
+                        color: AppColors.forestGreen,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Join Thulirva for fresh daily farm dairy & products',
+                      style: TextStyle(
+                        color: Color(0xFF6E8072),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Full Name
+                    _buildInputLabel('Full Name'),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _nameController,
+                      validator: (val) => val == null || val.trim().isEmpty ? 'Please enter your name' : null,
+                      decoration: _inputDecoration('Enter your full name', Icons.person_outline),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Phone Number
+                    _buildInputLabel('Phone Number'),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      validator: (val) => val == null || val.trim().isEmpty ? 'Please enter your phone number' : null,
+                      decoration: _inputDecoration('Enter 10-digit phone number', Icons.phone_outlined),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Email Address
+                    _buildInputLabel('Email Address'),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (val) => val == null || !val.contains('@') ? 'Please enter a valid email' : null,
+                      decoration: _inputDecoration('Enter your email address', Icons.alternate_email),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Password
+                    _buildInputLabel('Password'),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      validator: (val) => val == null || val.length < 6 ? 'Password must be at least 6 characters' : null,
+                      decoration: _inputDecoration(
+                        'Create password (min 6 chars)',
+                        Icons.lock_outline,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            color: const Color(0xFF6E8072),
+                            size: 20,
+                          ),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Confirm Password
+                    _buildInputLabel('Confirm Password'),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscureConfirm,
+                      validator: (val) => val == null || val.isEmpty ? 'Please confirm your password' : null,
+                      decoration: _inputDecoration(
+                        'Re-enter your password',
+                        Icons.lock_outline,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                            color: const Color(0xFF6E8072),
+                            size: 20,
+                          ),
+                          onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Create Account Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: authState.isLoading ? null : _handleRegister,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.forestGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: authState.isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Text(
+                                    'Create Account',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Icon(Icons.arrow_forward, size: 18),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Already have an account? Sign In
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Already have an account?',
+                            style: TextStyle(color: Color(0xFF6E8072), fontSize: 13.5),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              'Sign In',
+                              style: TextStyle(
+                                color: AppColors.forestGreen,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
                   ],
                 ),
-                const SizedBox(height: 20),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    Widget? suffixIcon,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+  Widget _buildInputLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        color: AppColors.forestGreen,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
       ),
-      child: TextFormField(
-        controller: controller,
-        obscureText: obscure,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-          prefixIcon: Icon(icon, color: const Color(0xFF143823), size: 20),
-          suffixIcon: suffixIcon,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-        validator: validator,
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint, IconData prefixIcon, {Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(prefixIcon, color: const Color(0xFF6E8072), size: 20),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFFE5EDE2)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFFE5EDE2)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.8),
       ),
     );
   }

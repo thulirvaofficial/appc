@@ -9,42 +9,42 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.lightCream,
+      backgroundColor: const Color(0xFFFAF7EE),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
+          icon: const Icon(Icons.arrow_back, color: AppColors.forestGreen),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
+        title: const Text(
           'About THULIRVA',
-          style: AppTypography.displaySmall.copyWith(
+          style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
+            fontWeight: FontWeight.w800,
+            color: AppColors.forestGreen,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Column(
           children: [
             // Crisp, High-Resolution Logo Card
             Container(
-              width: 130,
-              height: 130,
-              padding: const EdgeInsets.all(10),
+              width: 100,
+              height: 100,
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.forestGreen.withValues(alpha: 0.25), width: 2),
+                border: Border.all(color: const Color(0xFFE5EDE2), width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF143823).withValues(alpha: 0.12),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
+                    color: AppColors.forestGreen.withValues(alpha: 0.08),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -53,7 +53,7 @@ class AboutScreen extends StatelessWidget {
                   'assets/images/logo/logo.jpg',
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const Center(
-                    child: Text('🌿', style: TextStyle(fontSize: 48)),
+                    child: Icon(Icons.eco, color: AppColors.forestGreen, size: 48),
                   ),
                 ),
               ),

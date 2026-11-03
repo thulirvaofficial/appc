@@ -7,6 +7,7 @@ import 'categories/categories_screen.dart';
 import 'home/home_screen.dart';
 import 'orders/my_orders_screen.dart';
 import 'profile/profile_screen.dart';
+import 'subscriptions/subscriptions_screen.dart';
 import 'widgets/side_menu_drawer.dart';
 
 class MainWrapper extends ConsumerStatefulWidget {
@@ -43,9 +44,10 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
 
     final screens = [
       HomeScreen(onOpenDrawer: openDrawer, onNavigateToTab: _onTabTapped),
-      const CategoriesScreen(),
+      CategoriesScreen(onNavigateToTab: _onTabTapped),
+      SubscriptionsScreen(onNavigateToTab: _onTabTapped),
       CartScreen(onContinueShopping: () => _onTabTapped(0)),
-      const MyOrdersScreen(),
+      MyOrdersScreen(onShopNow: () => _onTabTapped(0)),
       ProfileScreen(onSelectTab: _onTabTapped),
     ];
 
@@ -60,68 +62,112 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: const Border(top: BorderSide(color: AppColors.border, width: 1)),
+          border: const Border(top: BorderSide(color: Color(0xFFE5EDE2), width: 1)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.forestGreen.withValues(alpha: 0.06),
+              color: AppColors.forestGreen.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          backgroundColor: Colors.white,
-          selectedItemColor: AppColors.forestGreen,
-          unselectedItemColor: AppColors.textMuted,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view),
-              label: 'Categories',
-            ),
-            BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: cartCount > 0,
-                backgroundColor: AppColors.cancelled,
-                label: Text(
-                  '$cartCount',
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  index: 0,
+                  label: 'Home',
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home,
                 ),
-                child: const Icon(Icons.shopping_cart_outlined),
-              ),
-              activeIcon: Badge(
-                isLabelVisible: cartCount > 0,
-                backgroundColor: AppColors.cancelled,
-                label: Text(
-                  '$cartCount',
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                _buildNavItem(
+                  index: 1,
+                  label: 'Categories',
+                  icon: Icons.grid_view_outlined,
+                  activeIcon: Icons.grid_view,
                 ),
-                child: const Icon(Icons.shopping_cart),
+                _buildNavItem(
+                  index: 2,
+                  label: 'Subscription',
+                  icon: Icons.calendar_month_outlined,
+                  activeIcon: Icons.calendar_month,
+                ),
+                _buildNavItem(
+                  index: 3,
+                  label: 'Cart',
+                  icon: Icons.shopping_cart_outlined,
+                  activeIcon: Icons.shopping_cart,
+                  badgeCount: cartCount,
+                ),
+                _buildNavItem(
+                  index: 4,
+                  label: 'Orders',
+                  icon: Icons.receipt_long_outlined,
+                  activeIcon: Icons.receipt_long,
+                ),
+                _buildNavItem(
+                  index: 5,
+                  label: 'Profile',
+                  icon: Icons.person_outline,
+                  activeIcon: Icons.person,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required String label,
+    required IconData icon,
+    required IconData activeIcon,
+    int badgeCount = 0,
+  }) {
+    final isSelected = _currentIndex == index;
+
+    return InkWell(
+      onTap: () => _onTabTapped(index),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: isSelected
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 5)
+            : const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFDDF0D6) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Badge(
+              isLabelVisible: badgeCount > 0,
+              backgroundColor: AppColors.cancelled,
+              label: Text(
+                '$badgeCount',
+                style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
               ),
-              label: 'Cart',
+              child: Icon(
+                isSelected ? activeIcon : icon,
+                color: isSelected ? AppColors.forestGreen : const Color(0xFF6E8072),
+                size: 21,
+              ),
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long_outlined),
-              activeIcon: Icon(Icons.receipt_long),
-              label: 'Orders',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                color: isSelected ? AppColors.forestGreen : const Color(0xFF6E8072),
+              ),
             ),
           ],
         ),
@@ -129,4 +175,3 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
     );
   }
 }
-

@@ -12,7 +12,6 @@ import '../orders/my_orders_screen.dart';
 import '../profile/about_screen.dart';
 import '../profile/addresses_screen.dart';
 import '../profile/offers_screen.dart';
-import '../subscriptions/subscriptions_screen.dart';
 
 class SideMenuDrawer extends ConsumerWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -102,14 +101,26 @@ class SideMenuDrawer extends ConsumerWidget {
                     },
                   ),
                   _buildMenuItem(
+                    icon: Icons.calendar_month_outlined,
+                    title: 'Milk Subscription',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onSelectTab?.call(2);
+                    },
+                  ),
+                  _buildMenuItem(
                     icon: Icons.receipt_long_outlined,
                     title: 'My Orders',
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MyOrdersScreen()),
-                      );
+                      if (onSelectTab != null) {
+                        onSelectTab!(4);
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MyOrdersScreen()),
+                        );
+                      }
                     },
                   ),
                   _buildMenuItem(

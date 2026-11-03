@@ -199,22 +199,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
 
     return Scaffold(
-      backgroundColor: AppColors.lightCream,
+      backgroundColor: const Color(0xFFFAF7EE),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: AppColors.forestGreen),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Checkout',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.forestGreen,
             fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
           ),
         ),
         centerTitle: true,
-        backgroundColor: AppColors.forestGreen,
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Column(

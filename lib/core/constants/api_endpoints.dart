@@ -1,8 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 class ApiEndpoints {
-  // Live Render Production Backend URL
-  static const String defaultLiveUrl = 'https://backend-fprs.onrender.com/api';
+  // Live Production Backend URL (Ubuntu VPS with Admin Panel at /admin & API at /api)
+  static const String defaultLiveUrl = 'http://15.235.251.225/api';
 
   static String _customBaseUrl = '';
   static void setBaseUrl(String url) => _customBaseUrl = url;
@@ -16,6 +14,15 @@ class ApiEndpoints {
 
     // Connects to live Render API first
     return defaultLiveUrl;
+  }
+
+  // Resolve static asset images from backend server
+  static String resolveImageUrl(String path) {
+    if (path.isEmpty) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final serverRoot = baseUrl.replaceAll('/api', '');
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$serverRoot$cleanPath';
   }
 
   // Auth

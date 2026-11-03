@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_dimensions.dart';
-import '../../../core/constants/app_typography.dart';
 
 class PromoBanner extends StatelessWidget {
   final VoidCallback onShopNow;
@@ -12,75 +10,48 @@ class PromoBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 145,
+      height: 165,
       decoration: BoxDecoration(
         color: AppColors.forestGreen,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: AppColors.forestGreen.withValues(alpha: 0.2),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: AppColors.forestGreen.withValues(alpha: 0.18),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // Background visual accent
-          Positioned(
-            right: -10,
-            bottom: -15,
-            width: 140,
-            height: 160,
-            child: Opacity(
-              opacity: 0.85,
-              child: Image.asset(
-                'assets/images/products/fresh_cow_milk.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Center(
-                  child: Text('🥛', style: TextStyle(fontSize: 64)),
-                ),
-              ),
-            ),
-          ),
-
-          // Gradient overlay
+          // Clean Farm Background (cows, bottle, ghee on right; green gradient on left - NO text)
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    AppColors.forestGreen,
-                    AppColors.forestGreen.withValues(alpha: 0.95),
-                    AppColors.forestGreen.withValues(alpha: 0.4),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.55, 0.75, 1.0],
-                ),
-              ),
+            child: Image.asset(
+              'assets/images/home_clean_bg.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
             ),
           ),
 
-          // Content
+          // Banner Content (Rendered EXACTLY ONCE via Flutter Widgets)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // "100% PURE & FRESH" Chip
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.mediumGreen,
+                    color: Colors.white.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     '100% PURE & FRESH',
                     style: TextStyle(
-                      color: AppColors.lightGold,
+                      color: Color(0xFFF7D97B),
                       fontSize: 9.5,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
@@ -88,31 +59,50 @@ class PromoBanner extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+
+                // Headline
+                const Text(
                   'Pure Goodness\nfrom Our Farms',
-                  style: AppTypography.displaySmall.copyWith(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    height: 1.2,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    height: 1.18,
                   ),
                 ),
                 const SizedBox(height: 10),
+
+                // Shop Now Button
                 InkWell(
                   onTap: onShopNow,
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.lightGold,
+                      color: const Color(0xFFE5A93C),
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: const Text(
-                      'Shop Now →',
-                      style: TextStyle(
-                        color: AppColors.forestGreen,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Shop Now',
+                          style: TextStyle(
+                            color: AppColors.forestGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward, size: 13, color: AppColors.forestGreen),
+                      ],
                     ),
                   ),
                 ),
@@ -124,4 +114,3 @@ class PromoBanner extends StatelessWidget {
     );
   }
 }
-

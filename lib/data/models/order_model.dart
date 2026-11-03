@@ -21,6 +21,9 @@ class OrderModel {
   final String? paymentProof;
   final String createdAt;
 
+  dynamic get orderId => id;
+  double get totalPrice => total;
+
   OrderModel({
     required this.id,
     this.userId,
