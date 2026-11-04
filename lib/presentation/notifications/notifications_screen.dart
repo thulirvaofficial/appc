@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../data/models/notification_model.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/order_provider.dart';
+import '../orders/my_orders_screen.dart';
 import '../orders/order_details_screen.dart';
 import '../profile/offers_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
@@ -25,90 +27,35 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     _NotifFilter(label: 'Offers', icon: Icons.local_offer_outlined),
   ];
 
-  // Default mock notifications matching the reference screen
-  final List<_VisualNotif> _referenceNotifs = [
-    _VisualNotif(
-      id: 'n1',
-      section: 'Today',
-      title: 'Out for Delivery',
-      message: 'Your milk order #TLV1024 is out for delivery and will reach you today by 8:00 AM.',
-      time: '10 min ago',
-      category: 'Orders',
-      icon: Icons.local_shipping_outlined,
-      iconBg: const Color(0xFFDCEFD7),
-      iconColor: AppColors.forestGreen,
-      cardBg: const Color(0xFFEBF7EA),
-      isUnread: true,
-    ),
-    _VisualNotif(
-      id: 'n2',
-      section: 'Today',
-      title: 'Subscription Renewal',
-      message: 'Your monthly subscription will renew in 3 days. Keep it active for uninterrupted delivery.',
-      time: '1 hour ago',
-      category: 'Subscription',
-      icon: Icons.calendar_month_outlined,
-      iconBg: const Color(0xFFE8F5E9),
-      iconColor: AppColors.forestGreen,
-      cardBg: const Color(0xFFF7FAF5),
-      isUnread: true,
-    ),
-    _VisualNotif(
-      id: 'n3',
-      section: 'Yesterday',
-      title: 'Order Delivered',
-      message: 'Your order #TLV1018 has been delivered successfully. Thank you!',
-      time: 'Yesterday, 5:30 PM',
-      category: 'Orders',
-      icon: Icons.inventory_2_outlined,
-      iconBg: const Color(0xFFFDF0D5),
-      iconColor: Color(0xFFB37418),
-      cardBg: Colors.white,
-      isUnread: false,
-    ),
-    _VisualNotif(
-      id: 'n4',
-      section: 'This Week',
-      title: 'Special Offer! 🎉',
-      message: 'Get 10% off on monthly milk subscriptions. Limited time only!',
-      time: 'Mon, 10:00 AM',
-      category: 'Offers',
-      icon: Icons.percent,
-      iconBg: const Color(0xFFDCEFD7),
-      iconColor: AppColors.forestGreen,
-      cardBg: const Color(0xFFEBF7EA),
-      isUnread: false,
-    ),
-    _VisualNotif(
-      id: 'n5',
-      section: 'This Week',
-      title: 'Welcome to Thulirva! 🌱',
-      message: 'Thank you for joining Thulirva. Enjoy fresh, pure and natural dairy products at your doorstep.',
-      time: 'Sun, 9:00 AM',
-      category: 'All',
-      icon: Icons.info_outline,
-      iconBg: const Color(0xFFFDF0D5),
-      iconColor: Color(0xFFB37418),
-      cardBg: Colors.white,
-      isUnread: false,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(notificationProvider.notifier).fetchNotifications());
+  }
 
-  void _handleDeepLink(String category) {
-    if (category == 'Orders') {
+  void _handleDeepLink(_VisualNotif notif) {
+    ref.read(notificationProvider.notifier).markAsRead(notif.id);
+
+    final cat = notif.category.toLowerCase();
+    if (cat.contains('order')) {
       final orders = ref.read(orderProvider).orders;
       if (orders.isNotEmpty) {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: orders.first)),
         );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyOrdersScreen()),
+        );
       }
-    } else if (category == 'Subscription') {
+    } else if (cat.contains('sub')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const SubscriptionsScreen()),
       );
-    } else if (category == 'Offers') {
+    } else if (cat.contains('offer')) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const OffersScreen()),
@@ -116,14 +63,112 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  _VisualNotif _mapModelToVisual(NotificationModel model) {
+    final tLower = model.type.toLowerCase();
+    final titleLower = model.title.toLowerCase();
+
+    String category = 'All';
+    IconData icon = Icons.notifications_active_outlined;
+    Color iconBg = const Color(0xFFDCEFD7);
+    Color iconColor = AppColors.forestGreen;
+    Color cardBg = model.isRead ? Colors.white : const Color(0xFFEBF7EA);
+
+    if (tLower.contains('order') || titleLower.contains('order') || titleLower.contains('delivery')) {
+      category = 'Orders';
+      icon = Icons.local_shipping_outlined;
+      iconBg = const Color(0xFFDCEFD7);
+      iconColor = AppColors.forestGreen;
+    } else if (tLower.contains('sub') || titleLower.contains('subscription') || titleLower.contains('renew')) {
+      category = 'Subscription';
+      icon = Icons.calendar_month_outlined;
+      iconBg = const Color(0xFFE8F5E9);
+      iconColor = AppColors.forestGreen;
+    } else if (tLower.contains('offer') || tLower.contains('promo') || titleLower.contains('offer') || titleLower.contains('discount')) {
+      category = 'Offers';
+      icon = Icons.percent;
+      iconBg = const Color(0xFFFDF0D5);
+      iconColor = const Color(0xFFB37418);
+    } else {
+      category = 'All';
+      icon = Icons.campaign_outlined;
+      iconBg = const Color(0xFFE3F2FD);
+      iconColor = const Color(0xFF1976D2);
+    }
+
+    String section = 'Earlier';
+    String timeAgo = 'Recently';
+    try {
+      final dt = DateTime.parse(model.createdAt);
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+
+      if (diff.inDays == 0) {
+        section = 'Today';
+        if (diff.inMinutes < 60) {
+          timeAgo = '${diff.inMinutes < 1 ? 1 : diff.inMinutes} min ago';
+        } else {
+          timeAgo = '${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} ago';
+        }
+      } else if (diff.inDays == 1) {
+        section = 'Yesterday';
+        timeAgo = 'Yesterday';
+      } else if (diff.inDays < 7) {
+        section = 'This Week';
+        timeAgo = '${diff.inDays} days ago';
+      }
+    } catch (_) {}
+
+    return _VisualNotif(
+      id: model.id,
+      section: section,
+      title: model.title,
+      message: model.message,
+      time: timeAgo,
+      category: category,
+      icon: icon,
+      iconBg: iconBg,
+      iconColor: iconColor,
+      cardBg: cardBg,
+      isUnread: !model.isRead,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filtered = _referenceNotifs.where((n) {
+    final notifState = ref.watch(notificationProvider);
+    final rawNotifications = notifState.notifications;
+
+    // Convert raw models to visual models
+    final List<_VisualNotif> allVisuals = rawNotifications.map(_mapModelToVisual).toList();
+
+    // If backend has no notifications yet, generate from user's live orders
+    if (allVisuals.isEmpty) {
+      final orders = ref.watch(orderProvider).orders;
+      for (final o in orders.take(3)) {
+        allVisuals.add(
+          _VisualNotif(
+            id: 'ord_${o.id}',
+            section: 'Today',
+            title: 'Order #${o.id} — ${o.orderStatus.toUpperCase()}',
+            message: 'Your order for ₹${o.total.toStringAsFixed(0)} is currently ${o.orderStatus}.',
+            time: 'Live',
+            category: 'Orders',
+            icon: Icons.inventory_2_outlined,
+            iconBg: const Color(0xFFDCEFD7),
+            iconColor: AppColors.forestGreen,
+            cardBg: const Color(0xFFEBF7EA),
+            isUnread: o.orderStatus.toLowerCase() == 'pending',
+          ),
+        );
+      }
+    }
+
+    final filtered = allVisuals.where((n) {
       if (_selectedFilter == 'All') return true;
       return n.category.toLowerCase() == _selectedFilter.toLowerCase();
     }).toList();
 
-    // Group filtered notifications by section
+    // Group filtered notifications by section preserving order
     final Map<String, List<_VisualNotif>> grouped = {};
     for (final n in filtered) {
       grouped.putIfAbsent(n.section, () => []).add(n);
@@ -139,7 +184,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.forestGreen,
-          onRefresh: () => ref.read(notificationProvider.notifier).fetchNotifications(),
+          onRefresh: () async {
+            await ref.read(notificationProvider.notifier).fetchNotifications();
+            await ref.read(orderProvider.notifier).fetchOrders();
+          },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
@@ -225,70 +273,76 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Grouped Notification Sections
-                ...grouped.entries.map((entry) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            entry.key,
-                            style: const TextStyle(
+                if (notifState.isLoading && allVisuals.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
+                  )
+                else if (allVisuals.isEmpty)
+                  // "You're All Caught Up!" Empty State
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEDF7EB),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.notifications_none, size: 36, color: AppColors.forestGreen),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "You're All Caught Up!",
+                            style: TextStyle(
                               color: AppColors.forestGreen,
-                              fontSize: 14,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                        ),
-                        ...entry.value.map((notif) => _buildNotificationCard(notif)),
-                      ],
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 24),
-
-                // "You're All Caught Up!" Section
-                Center(
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: 90,
-                        height: 70,
-                        child: Image.asset(
-                          'assets/images/notifications_bell.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.notifications_active,
-                            color: Color(0xFFE5A93C),
-                            size: 48,
+                          const SizedBox(height: 6),
+                          const Text(
+                            "No new notifications right now. We'll alert you when your order status updates or new farm fresh items arrive.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF6E8072), fontSize: 13),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'You\'re All Caught Up!',
-                        style: TextStyle(
-                          color: AppColors.forestGreen,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
+                    ),
+                  )
+                else ...[
+                  // Grouped Notification Sections
+                  ...grouped.entries.map((entry) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(
+                              entry.key,
+                              style: const TextStyle(
+                                color: AppColors.forestGreen,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          ...entry.value.map((notif) => _buildNotificationCard(notif)),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'No new notifications at the moment.',
-                        style: TextStyle(
-                          color: Color(0xFF6E8072),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
+                    );
+                  }),
+                ],
+
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -299,7 +353,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Widget _buildNotificationCard(_VisualNotif notif) {
     return GestureDetector(
-      onTap: () => _handleDeepLink(notif.category),
+      onTap: () => _handleDeepLink(notif),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),

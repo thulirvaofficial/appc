@@ -24,6 +24,14 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Prevent RFC 3986 leading-slash stripping of /api
+          if (!options.path.startsWith('http')) {
+            String clean = options.path.trim();
+            if (clean.startsWith('/')) clean = clean.substring(1);
+            if (clean.startsWith('api/')) clean = clean.substring(4);
+            options.path = '${ApiEndpoints.baseUrl}/$clean';
+          }
+
           final token = await StorageService.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';

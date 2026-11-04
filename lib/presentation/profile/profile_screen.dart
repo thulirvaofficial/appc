@@ -7,6 +7,7 @@ import '../notifications/notifications_screen.dart';
 import '../orders/my_orders_screen.dart';
 import '../widgets/thulirva_app_bar.dart';
 import '../widgets/thulirva_text_field.dart';
+import '../../core/services/notification_permission_service.dart';
 import 'about_screen.dart';
 import 'addresses_screen.dart';
 import 'offers_screen.dart';
@@ -66,34 +67,51 @@ class ProfileScreen extends ConsumerWidget {
   void _showSettingsDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('App Settings', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.forestGreen)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              title: const Text('Push Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Receive order & subscription updates', style: TextStyle(fontSize: 12)),
-              value: true,
-              activeThumbColor: AppColors.forestGreen,
-              onChanged: (_) {},
-            ),
-            SwitchListTile(
-              title: const Text('Early Morning Reminders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              subtitle: const Text('5:30 AM dispatch alert', style: TextStyle(fontSize: 12)),
-              value: true,
-              activeThumbColor: AppColors.forestGreen,
-              onChanged: (_) {},
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700)),
-          ),
-        ],
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return FutureBuilder<bool>(
+            future: NotificationPermissionService.isPermissionGranted(),
+            builder: (ctx, snap) {
+              final isGranted = snap.data ?? false;
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: const Text('App Settings', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.forestGreen)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Push Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: Text(isGranted ? 'Alerts active • Tap to open system settings' : 'Alerts disabled • Tap to turn on', style: const TextStyle(fontSize: 12)),
+                      value: isGranted,
+                      activeThumbColor: AppColors.forestGreen,
+                      onChanged: (val) async {
+                        if (val) {
+                          await NotificationPermissionService.requestPermission();
+                        } else {
+                          await NotificationPermissionService.openSettings();
+                        }
+                        setDialogState(() {});
+                      },
+                    ),
+                    SwitchListTile(
+                      title: const Text('Early Morning Reminders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('5:30 AM milk dispatch alert', style: TextStyle(fontSize: 12)),
+                      value: true,
+                      activeThumbColor: AppColors.forestGreen,
+                      onChanged: (_) {},
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Done', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }

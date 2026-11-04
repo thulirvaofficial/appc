@@ -20,8 +20,13 @@ class OrderModel {
   final String? transactionId;
   final String? paymentProof;
   final String createdAt;
+  final String deliveryType;
+  final bool isPickup;
+  final String? pickupSlot;
+  final String? pickupLocationName;
+  final String? orderNumber;
 
-  dynamic get orderId => id;
+  dynamic get orderId => orderNumber ?? id;
   double get totalPrice => total;
 
   OrderModel({
@@ -46,9 +51,17 @@ class OrderModel {
     this.transactionId,
     this.paymentProof,
     required this.createdAt,
+    this.deliveryType = 'delivery',
+    this.isPickup = false,
+    this.pickupSlot,
+    this.pickupLocationName,
+    this.orderNumber,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
+    final dType = (json['delivery_type'] ?? json['order_type'] ?? 'delivery').toString().toLowerCase();
+    final isPick = json['is_pickup'] == true || dType == 'pickup';
+
     return OrderModel(
       id: json['id'] ?? '',
       userId: json['user_id'] ?? json['userId'],
@@ -63,14 +76,19 @@ class OrderModel {
       subtotal: double.tryParse((json['subtotal'] ?? 0).toString()) ?? 0.0,
       deliveryCharge: double.tryParse((json['delivery_charge'] ?? 30).toString()) ?? 30.0,
       discountAmount: double.tryParse((json['discount_amount'] ?? 0).toString()) ?? 0.0,
-      promoCode: json['promo_code'],
-      total: double.tryParse((json['total'] ?? json['total_price'] ?? 0).toString()) ?? 0.0,
+      promoCode: json['promo_code'] ?? json['coupon_code'],
+      total: double.tryParse((json['total'] ?? json['total_price'] ?? json['total_amount'] ?? 0).toString()) ?? 0.0,
       paymentMethod: json['payment_method'] ?? 'UPI Direct',
       paymentStatus: json['payment_status'] ?? 'pending',
-      orderStatus: json['order_status'] ?? 'pending',
+      orderStatus: json['order_status'] ?? json['status'] ?? 'pending',
       transactionId: json['transaction_id'] ?? json['transactionId'],
       paymentProof: json['payment_proof'] ?? json['paymentProof'],
       createdAt: json['created_at'] ?? DateTime.now().toString(),
+      deliveryType: dType,
+      isPickup: isPick,
+      pickupSlot: json['pickup_slot']?.toString(),
+      pickupLocationName: json['pickup_location_name']?.toString(),
+      orderNumber: json['order_number']?.toString(),
     );
   }
 
@@ -97,7 +115,11 @@ class OrderModel {
       'transaction_id': transactionId,
       'payment_proof': paymentProof,
       'created_at': createdAt,
+      'delivery_type': deliveryType,
+      'is_pickup': isPickup,
+      'pickup_slot': pickupSlot,
+      'pickup_location_name': pickupLocationName,
+      'order_number': orderNumber,
     };
   }
 }
-

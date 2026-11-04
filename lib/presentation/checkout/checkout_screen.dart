@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../data/models/address_model.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/api_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
@@ -27,6 +29,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   // Delivery Method: 'delivery' or 'pickup'
   String _deliveryMethod = 'delivery';
 
+  // Dynamic Pickup Locations & Settings
+  List<dynamic> _pickupLocations = [];
+  dynamic _selectedPickupLocation;
+  bool _pickupEnabled = false;
+  List<dynamic> _serviceableLocations = [];
+  dynamic _selectedDeliveryZone;
+
   // Selected Pickup Slot
   String _selectedPickupSlot = '7:00 AM - 9:00 AM';
   final List<String> _pickupSlots = [
@@ -41,6 +50,43 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   File? _paymentProofFile;
   String? _paymentProofBase64;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDynamicStoresAndLocations();
+  }
+
+  Future<void> _fetchDynamicStoresAndLocations() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final locRes = await api.get(ApiEndpoints.pickupLocations);
+      final setRes = await api.get('/pickup/settings');
+      final delRes = await api.get(ApiEndpoints.deliveryLocations);
+
+      if (mounted) {
+        setState(() {
+          if (locRes.data is Map && locRes.data['locations'] is List) {
+            _pickupLocations = locRes.data['locations'] as List;
+            if (_pickupLocations.isNotEmpty) {
+              _selectedPickupLocation = _pickupLocations.first;
+            }
+          }
+          if (setRes.data is Map && setRes.data['settings'] is Map) {
+            _pickupEnabled = setRes.data['settings']['pickup_enabled'] == true || _pickupLocations.isNotEmpty;
+          } else {
+            _pickupEnabled = _pickupLocations.isNotEmpty;
+          }
+          if (delRes.data is Map && delRes.data['locations'] is List) {
+            _serviceableLocations = delRes.data['locations'] as List;
+            if (_serviceableLocations.isNotEmpty && _selectedDeliveryZone == null) {
+              _selectedDeliveryZone = _serviceableLocations.first;
+            }
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -266,13 +312,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'delivery_type': isPickup ? 'pickup' : 'delivery',
       'order_type': isPickup ? 'pickup' : 'delivery',
       'is_pickup': isPickup,
-      'pickup_location_id': 1,
-      'pickup_location_name': storeSettings.storeName,
+      'delivery_zone': isPickup ? null : (_selectedDeliveryZone is Map ? _selectedDeliveryZone['name'] : _selectedDeliveryZone?.toString()),
+      'pickup_location_id': _selectedPickupLocation?['id'] ?? 1,
+      'pickup_location_name': _selectedPickupLocation?['name'] ?? storeSettings.storeName,
       'pickup_slot': isPickup ? _selectedPickupSlot : null,
-      'address': isPickup ? storeSettings.storeAddress : selectedAddr!.address,
-      'city': isPickup ? 'Kanchipuram' : selectedAddr!.city,
+      'address': isPickup ? (_selectedPickupLocation?['address'] ?? storeSettings.storeAddress) : selectedAddr!.address,
+      'city': isPickup ? (_selectedPickupLocation?['city'] ?? 'Kanchipuram') : selectedAddr!.city,
       'state': isPickup ? 'Tamil Nadu' : selectedAddr!.state,
-      'pincode': isPickup ? '631601' : selectedAddr!.pincode,
+      'pincode': isPickup ? (_selectedPickupLocation?['pincode'] ?? '631601') : selectedAddr!.pincode,
       'items': cartState.items.map((i) => {
         'id': i.product.id,
         'name': i.product.name,
@@ -299,6 +346,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!mounted) return;
 
     if (order != null) {
+      SystemSound.play(SystemSoundType.alert);
       ref.read(cartProvider.notifier).clearCart();
       Navigator.pushReplacement(
         context,
@@ -415,8 +463,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               ],
                             ),
                           ),
-                        ] else ...[
-                          // Selectable 2-Option Cards
+                        ] else if (_pickupEnabled && _pickupLocations.isNotEmpty) ...[
+                          // Selectable 2-Option Cards (Home Delivery & Self Pickup)
                           Row(
                             children: [
                               // Home Delivery Card
@@ -505,6 +553,28 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               ),
                             ],
                           ),
+                        ] else ...[
+                          // When Pickup is disabled by admin, only Doorstep Delivery is shown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDF7EB),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFD6E6D3)),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.local_shipping_outlined, color: AppColors.forestGreen, size: 20),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Doorstep Delivery Available across Chennai & Kanchipuram zones.',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.forestGreen),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -513,7 +583,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
                   // 2. LOCATION / ADDRESS SECTION
                   if (isPickup) ...[
-                    // Farm Store Self-Pickup Information Card
+                    // Dynamic Store Self-Pickup Information Card
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -529,36 +599,114 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               Text('🏪', style: TextStyle(fontSize: 20)),
                               SizedBox(width: 8),
                               Text(
-                                'Pickup Location & Timings',
+                                'Select Pickup Store & Timings',
                                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            storeSettings.storeName,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.forestGreen),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            storeSettings.storeAddress,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E), height: 1.3),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(Icons.access_time, size: 14, color: AppColors.forestGreen),
-                              const SizedBox(width: 4),
-                              Text('Hours: ${storeSettings.storeTimings}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF4A5D4E))),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.phone_outlined, size: 14, color: AppColors.forestGreen),
-                              const SizedBox(width: 4),
-                              Text('Phone: ${storeSettings.storePhone}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF4A5D4E))),
-                            ],
+                          const SizedBox(height: 12),
+
+                          // Dynamic Store Selector Dropdown
+                          if (_pickupLocations.isNotEmpty) ...[
+                            const Text(
+                              'Choose Pickup Location *',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFAF7EE),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<dynamic>(
+                                  isExpanded: true,
+                                  value: _selectedPickupLocation ?? _pickupLocations.first,
+                                  items: _pickupLocations.map((loc) {
+                                    final name = loc['name'] ?? 'Store';
+                                    final city = loc['city'] ?? '';
+                                    return DropdownMenuItem<dynamic>(
+                                      value: loc,
+                                      child: Text(
+                                        city.isNotEmpty ? '$name ($city)' : name,
+                                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _selectedPickupLocation = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          // Selected Store Details Card
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAF8),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE5EDE2)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _selectedPickupLocation?['name'] ?? storeSettings.storeName,
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.forestGreen),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${_selectedPickupLocation?['address'] ?? storeSettings.storeAddress}, ${_selectedPickupLocation?['city'] ?? 'Kanchipuram'} - ${_selectedPickupLocation?['pincode'] ?? '631601'}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E), height: 1.3),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.access_time, size: 14, color: AppColors.forestGreen),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        'Hours: ${_selectedPickupLocation?['timings'] ?? storeSettings.storeTimings}',
+                                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF4A5D4E)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.phone_outlined, size: 14, color: AppColors.forestGreen),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Contact: ${_selectedPickupLocation?['phone'] ?? storeSettings.storePhone}',
+                                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF4A5D4E)),
+                                    ),
+                                  ],
+                                ),
+                                if ((_selectedPickupLocation?['instructions'] ?? '').toString().isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.info_outline, size: 14, color: Color(0xFF55705C)),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${_selectedPickupLocation['instructions']}',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF55705C), fontStyle: FontStyle.italic),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 14),
 
@@ -622,7 +770,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ),
                     ),
                   ] else ...[
-                    // Doorstep Delivery Address Card
+                    // Doorstep Delivery Address Card + Serviceable Locations
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -679,6 +827,89 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             const Text(
                               'No address selected. Tap "+ Add Address" to provide doorstep delivery details.',
                               style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                            ),
+                          ],
+
+                          // Serviceable Delivery Locations & Zone Selection Dropdown
+                          if (_serviceableLocations.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFAF7EE),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE5EDE2)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.location_city, size: 15, color: AppColors.forestGreen),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Select Delivery Zone *',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  DropdownButtonFormField<dynamic>(
+                                    initialValue: _selectedDeliveryZone ?? _serviceableLocations.first,
+                                    decoration: InputDecoration(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5EDE2))),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5EDE2))),
+                                    ),
+                                    isExpanded: true,
+                                    items: _serviceableLocations.map((loc) {
+                                      final name = loc is Map ? (loc['name'] ?? 'Zone') : loc.toString();
+                                      final city = loc is Map ? (loc['city'] ?? '') : '';
+                                      final label = city.toString().isNotEmpty ? '$name, $city' : name;
+                                      return DropdownMenuItem<dynamic>(
+                                        value: loc,
+                                        child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.forestGreen)),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => _selectedDeliveryZone = val);
+                                    },
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.verified, size: 14, color: AppColors.forestGreen),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Delivering Daily Across Key Zones:',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: _serviceableLocations.take(8).map((l) {
+                                      final name = l is Map ? (l['name'] ?? '') : l.toString();
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFD6E6D3)),
+                                        ),
+                                        child: Text(
+                                          name,
+                                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.forestGreen),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ],

@@ -58,6 +58,8 @@ class ApiEndpoints {
 
   // Settings
   static const String storeSettings = '/settings/store';
+  static const String pickupLocations = '/pickup/locations';
+  static const String deliveryLocations = '/locations';
 
   // Notifications
   static const String userNotifications = '/notifications/user';

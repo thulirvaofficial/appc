@@ -38,6 +38,9 @@ class OrderState {
   List<OrderModel> get filteredOrders {
     if (selectedFilter == 'All') return orders;
     final f = selectedFilter.toLowerCase();
+    if (f == 'store pickup' || f == 'pickup') {
+      return orders.where((o) => o.isPickup || o.deliveryType == 'pickup').toList();
+    }
     return orders.where((o) => o.orderStatus.toLowerCase() == f).toList();
   }
 }

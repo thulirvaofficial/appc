@@ -22,6 +22,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
     _OrderFilter(label: 'Processing', icon: Icons.access_time),
     _OrderFilter(label: 'Shipped', icon: Icons.local_shipping_outlined),
     _OrderFilter(label: 'Delivered', icon: Icons.check_circle_outline),
+    _OrderFilter(label: 'Store Pickup', icon: Icons.storefront_outlined),
   ];
 
   Color _getStatusColor(String status) {

@@ -23,7 +23,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
   int _currentStep = 1; // 1: Select Plan & Details, 2: UPI Payment & UTR
   SubscriptionPlanModel? _selectedPlan;
   int _quantity = 1;
-  String _selectedSlot = '6:00 AM - 7:00 AM';
+  String _selectedSlot = 'Morning: 6:00 AM - 7:00 AM';
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   final TextEditingController _utrController = TextEditingController();
 
@@ -34,9 +34,12 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
   }
 
   final List<String> _slots = [
-    '5:30 AM - 6:30 AM',
-    '6:00 AM - 7:00 AM',
-    '7:00 AM - 8:00 AM',
+    'Morning: 5:30 AM - 6:30 AM',
+    'Morning: 6:00 AM - 7:00 AM',
+    'Morning: 7:00 AM - 8:00 AM',
+    'Evening: 5:00 PM - 6:00 PM',
+    'Evening: 6:00 PM - 7:00 PM',
+    'Both Morning & Evening',
   ];
 
   @override
@@ -203,27 +206,32 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
         const SizedBox(height: 14),
         Text('Daily Quantity (Packets) *', style: AppTypography.titleSmall),
         const SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [1, 2, 3, 4].map((q) {
             final isSel = _quantity == q;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ChoiceChip(
-                label: Text('$q Packet${q > 1 ? 's' : ''}'),
-                selected: isSel,
-                onSelected: (_) => setState(() => _quantity = q),
-                selectedColor: AppColors.forestGreen,
-                labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w700),
+            return ChoiceChip(
+              label: Text('$q Packet${q > 1 ? 's' : ''}'),
+              selected: isSel,
+              onSelected: (_) => setState(() => _quantity = q),
+              selectedColor: AppColors.forestGreen,
+              labelStyle: TextStyle(
+                color: isSel ? Colors.white : AppColors.textDark,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
               ),
+              side: BorderSide(color: isSel ? AppColors.forestGreen : AppColors.border),
             );
           }).toList(),
         ),
 
         const SizedBox(height: 14),
-        Text('Morning Delivery Slot *', style: AppTypography.titleSmall),
+        Text('Delivery Slot (Morning / Evening) *', style: AppTypography.titleSmall),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
+          runSpacing: 8,
           children: _slots.map((s) {
             final isSel = _selectedSlot == s;
             return ChoiceChip(
@@ -231,7 +239,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
               selected: isSel,
               onSelected: (_) => setState(() => _selectedSlot = s),
               selectedColor: AppColors.forestGreen,
-              labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w600, fontSize: 12),
+              labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w600, fontSize: 11.5),
             );
           }).toList(),
         ),

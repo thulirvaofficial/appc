@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -11,7 +12,10 @@ import '../../providers/settings_provider.dart';
 import '../cart/cart_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../products/products_list_screen.dart';
+import '../products/product_details_screen.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/notification_permission_modal.dart';
+import '../../core/services/notification_permission_service.dart';
 import '../widgets/product_card.dart';
 import 'widgets/category_bubble.dart';
 import 'widgets/promo_banner.dart';
@@ -28,6 +32,32 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _notifGranted = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkNotificationPermission();
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    final granted = await NotificationPermissionService.isPermissionGranted();
+    if (mounted) {
+      setState(() => _notifGranted = granted);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        NotificationPermissionModal.showIfEligible(context).then((_) {
+          if (mounted) {
+            NotificationPermissionService.isPermissionGranted().then((g) {
+              if (mounted) setState(() => _notifGranted = g);
+            });
+          }
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -178,30 +208,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Pill Search Bar
+                      // Pill Search Bar with Live Suggestions
                       Container(
-                        height: 44,
+                        height: 46,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
                         child: TextField(
                           controller: _searchController,
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val.trim();
+                            });
+                          },
                           onSubmitted: (query) {
-                            ref.read(productProvider.notifier).setSearchQuery(query);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ProductsListScreen(initialSearchQuery: query),
-                              ),
-                            );
+                            if (query.trim().isNotEmpty) {
+                              ref.read(productProvider.notifier).setSearchQuery(query.trim());
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProductsListScreen(initialSearchQuery: query.trim()),
+                                ),
+                              );
+                            }
                           },
                           decoration: InputDecoration(
                             hintText: 'Search fresh milk, paneer, ghee...',
@@ -215,6 +252,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     icon: const Icon(Icons.clear, size: 16),
                                     onPressed: () {
                                       _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
                                       ref.read(productProvider.notifier).setSearchQuery('');
                                     },
                                   )
@@ -222,10 +262,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 13),
                           ),
                         ),
                       ),
+
+                      // Live Search Suggestions Overlay (Swiggy / Flipkart style)
+                      if (_searchQuery.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildLiveSearchSuggestions(products),
+                      ],
                     ],
                   ),
                 ),
@@ -237,6 +283,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Notification Reminder Banner if turned off
+                      if (!_notifGranted) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF9E6),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFF0D68A)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.notifications_off_outlined, color: Color(0xFF856404), size: 20),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Delivery alerts are off. Turn on to track your fresh farm order in real-time.',
+                                  style: TextStyle(fontSize: 11.5, color: Color(0xFF856404), fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () => NotificationPermissionModal.showForcePrompt(context).then((_) => _checkNotificationPermission()),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.forestGreen,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text('Enable', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       // Promo Hero Banner
                       PromoBanner(
                         onShopNow: () {
@@ -552,6 +635,147 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               height: 1.15,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // Live Search Suggestions Overlay (Swiggy / Flipkart style)
+  Widget _buildLiveSearchSuggestions(List<dynamic> products) {
+    final q = _searchQuery.toLowerCase();
+    final matches = products.where((p) {
+      final name = p.name.toString().toLowerCase();
+      final cat = (p.categoryName ?? '').toString().toLowerCase();
+      final desc = (p.description ?? '').toString().toLowerCase();
+      return name.contains(q) || cat.contains(q) || desc.contains(q);
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (matches.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  const Icon(Icons.search_off, color: Colors.grey, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No products matching "$_searchQuery". Try "milk", "ghee", or "paneer".',
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF6E8072)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            ...matches.take(4).map((p) {
+              return InkWell(
+                onTap: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ProductDetailsScreen(product: p)),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      // Thumbnail
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEDF7EB),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: (p.fullImageUrl ?? '').toString().isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: p.fullImageUrl,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => const Icon(Icons.eco, color: AppColors.forestGreen, size: 20),
+                              )
+                            : const Icon(Icons.eco, color: AppColors.forestGreen, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.name,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.forestGreen),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              (p.weight ?? '').toString().isNotEmpty ? p.weight : 'Fresh produce',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF6E8072)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '₹${p.price.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.forestGreen),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFFAF7EE),
+              child: InkWell(
+                onTap: () {
+                  final query = _searchQuery;
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                  ref.read(productProvider.notifier).setSearchQuery(query);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductsListScreen(initialSearchQuery: query),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'See all ${matches.length} results for "$_searchQuery"',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: AppColors.forestGreen),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward, size: 14, color: AppColors.forestGreen),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
