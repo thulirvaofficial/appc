@@ -19,15 +19,14 @@ class ProductDetailsScreen extends ConsumerStatefulWidget {
 
 class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   int _quantity = 1;
-  late String _selectedVariant;
+  ProductVariantModel? _selectedVariant;
   bool _isFavorite = false;
-
-  final List<String> _variants = ['200 g', '500 g', '1 kg'];
 
   @override
   void initState() {
     super.initState();
-    _selectedVariant = widget.product.weight.isNotEmpty ? widget.product.weight : '500 ml';
+    final p = widget.product;
+    _selectedVariant = p.defaultVariant ?? (p.variants.isNotEmpty ? p.variants.first : null);
   }
 
   @override
@@ -151,46 +150,74 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Price
-                        Text(
-                          '₹${p.price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Available Variants Chips (Mockup: [200 g] [500 g] [1 kg])
+                        // Dynamic Price & Compare Price
                         Row(
-                          children: _variants.map((v) {
-                            final isSel = _selectedVariant == v;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: ChoiceChip(
-                                label: Text(v),
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '₹${(_selectedVariant?.price ?? p.price).toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                            if ((_selectedVariant?.comparePrice ?? p.comparePrice) != null &&
+                                (_selectedVariant?.comparePrice ?? p.comparePrice)! > (_selectedVariant?.price ?? p.price)) ...[
+                              const SizedBox(width: 10),
+                              Text(
+                                '₹${(_selectedVariant?.comparePrice ?? p.comparePrice)!.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF8A9A8C),
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Dynamic Available Variants Chips (Configured in Backend)
+                        if (p.variants.isNotEmpty) ...[
+                          const Text(
+                            'Select Weight / Size:',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6E8072)),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 8,
+                            children: p.variants.map((v) {
+                              final isSel = _selectedVariant?.id == v.id;
+                              final inStock = v.stock > 0;
+                              return ChoiceChip(
+                                label: Text('${v.name} • ₹${v.price.toStringAsFixed(0)}'),
                                 selected: isSel,
-                                onSelected: (_) => setState(() => _selectedVariant = v),
+                                onSelected: inStock ? (_) => setState(() => _selectedVariant = v) : null,
                                 selectedColor: AppColors.forestGreen,
-                                backgroundColor: Colors.white,
+                                backgroundColor: inStock ? Colors.white : const Color(0xFFF3F3F3),
                                 labelStyle: TextStyle(
-                                  color: isSel ? Colors.white : AppColors.textDark,
+                                  color: isSel ? Colors.white : (inStock ? AppColors.textDark : Colors.grey),
                                   fontWeight: isSel ? FontWeight.w700 : FontWeight.w600,
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                 ),
                                 side: BorderSide(
                                   color: isSel ? AppColors.forestGreen : AppColors.border,
+                                  width: isSel ? 1.5 : 1,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
                                 showCheckmark: false,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         const SizedBox(height: 18),
 
                         // Description
@@ -255,7 +282,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                           ref.read(cartProvider.notifier).addToCart(
                                 p,
                                 quantity: _quantity,
-                                variant: _selectedVariant,
+                                variantModel: _selectedVariant,
                               );
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(

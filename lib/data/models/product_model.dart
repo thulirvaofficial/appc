@@ -1,5 +1,61 @@
 import '../../core/constants/api_endpoints.dart';
 
+class ProductVariantModel {
+  final dynamic id;
+  final dynamic productId;
+  final String name;
+  final String weightValue;
+  final String unit;
+  final double price;
+  final double? comparePrice;
+  final int stock;
+  final bool isDefault;
+  final bool isActive;
+
+  ProductVariantModel({
+    required this.id,
+    this.productId,
+    required this.name,
+    this.weightValue = '',
+    this.unit = 'g',
+    required this.price,
+    this.comparePrice,
+    this.stock = 50,
+    this.isDefault = false,
+    this.isActive = true,
+  });
+
+  factory ProductVariantModel.fromJson(Map<String, dynamic> json) {
+    return ProductVariantModel(
+      id: json['id'] ?? 0,
+      productId: json['product_id'] ?? json['productId'],
+      name: json['name']?.toString() ?? 'Standard',
+      weightValue: json['weight_value']?.toString() ?? '',
+      unit: json['unit']?.toString() ?? 'g',
+      price: double.tryParse((json['price'] ?? 0).toString()) ?? 0.0,
+      comparePrice: json['compare_price'] != null ? double.tryParse(json['compare_price'].toString()) : null,
+      stock: int.tryParse((json['stock'] ?? 50).toString()) ?? 50,
+      isDefault: json['is_default'] == true,
+      isActive: json['is_active'] != false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'product_id': productId,
+      'name': name,
+      'weight_value': weightValue,
+      'unit': unit,
+      'price': price,
+      'compare_price': comparePrice,
+      'stock': stock,
+      'is_default': isDefault,
+      'is_active': isActive,
+    };
+  }
+}
+
 class ProductModel {
   final dynamic id;
   final String name;
@@ -14,6 +70,7 @@ class ProductModel {
   final String? image;
   final String? description;
   final String status;
+  final List<ProductVariantModel> variants;
 
   ProductModel({
     required this.id,
@@ -29,24 +86,106 @@ class ProductModel {
     this.image,
     this.description,
     this.status = 'active',
+    this.variants = const [],
   });
 
-  factory ProductModel.fromJson(Map<String, dynamic> json) {
-    return ProductModel(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
-      category: json['category'] ?? json['category_name'] ?? 'Dairy',
-      categoryName: json['category_name'] ?? json['category'],
-      price: double.tryParse(json['price'].toString()) ?? 0.0,
-      comparePrice: json['compare_price'] != null ? double.tryParse(json['compare_price'].toString()) : null,
-      weight: json['weight'] ?? '',
-      stock: int.tryParse(json['stock'].toString()) ?? 50,
-      badge: json['badge'],
-      emoji: json['emoji'] ?? '🥛',
-      image: json['image'],
-      description: json['description'],
-      status: json['status'] ?? 'active',
+  ProductVariantModel? get defaultVariant {
+    if (variants.isEmpty) return null;
+    return variants.firstWhere(
+      (v) => v.isDefault,
+      orElse: () => variants.first,
     );
+  }
+
+  factory ProductModel.fromJson(Map<String, dynamic> json) {
+    final parsedId = json['id'] ?? json['product_id'] ?? 0;
+    final parsedName = (json['name'] ?? json['title'] ?? json['product_name'] ?? 'Fresh Farm Product').toString();
+    final parsedPrice = double.tryParse((json['price'] ?? 0).toString()) ?? 0.0;
+    final parsedWeight = (json['weight'] ?? '').toString();
+
+    // Parse variants if provided by backend API
+    List<ProductVariantModel> parsedVariants = [];
+    if (json['variants'] is List && (json['variants'] as List).isNotEmpty) {
+      parsedVariants = (json['variants'] as List)
+          .map((v) => ProductVariantModel.fromJson(Map<String, dynamic>.from(v as Map)))
+          .where((v) => v.isActive)
+          .toList();
+    }
+
+    // Dynamic generation if backend hasn't assigned custom variants yet
+    if (parsedVariants.isEmpty) {
+      parsedVariants = _generateDefaultVariants(parsedId, parsedName, parsedPrice, parsedWeight);
+    }
+
+    return ProductModel(
+      id: parsedId,
+      name: parsedName,
+      category: (json['category'] ?? json['category_name'] ?? 'Dairy').toString(),
+      categoryName: json['category_name']?.toString() ?? json['category']?.toString(),
+      price: parsedPrice,
+      comparePrice: json['compare_price'] != null ? double.tryParse(json['compare_price'].toString()) : null,
+      weight: parsedWeight,
+      stock: int.tryParse((json['stock'] ?? 50).toString()) ?? 50,
+      badge: json['badge']?.toString(),
+      emoji: json['emoji']?.toString() ?? '🥛',
+      image: json['image']?.toString() ?? json['image_url']?.toString(),
+      description: json['description']?.toString(),
+      status: (json['status'] ?? 'active').toString(),
+      variants: parsedVariants,
+    );
+  }
+
+  static List<ProductVariantModel> _generateDefaultVariants(dynamic pid, String name, double basePrice, String weight) {
+    final nameLower = name.toLowerCase();
+
+    if (nameLower.contains('almond')) {
+      return [
+        ProductVariantModel(id: 101, productId: pid, name: '100g', weightValue: '100', unit: 'g', price: 120, comparePrice: 140, stock: 50, isDefault: true),
+        ProductVariantModel(id: 102, productId: pid, name: '250g', weightValue: '250', unit: 'g', price: 280, comparePrice: 320, stock: 40),
+        ProductVariantModel(id: 103, productId: pid, name: '500g', weightValue: '500', unit: 'g', price: 520, comparePrice: 600, stock: 35),
+        ProductVariantModel(id: 104, productId: pid, name: '1kg', weightValue: '1', unit: 'kg', price: 990, comparePrice: 1150, stock: 20),
+      ];
+    }
+    if (nameLower.contains('cashew')) {
+      return [
+        ProductVariantModel(id: 201, productId: pid, name: '200g', weightValue: '200', unit: 'g', price: 180, comparePrice: 210, stock: 45, isDefault: true),
+        ProductVariantModel(id: 202, productId: pid, name: '500g', weightValue: '500', unit: 'g', price: 420, comparePrice: 480, stock: 30),
+        ProductVariantModel(id: 203, productId: pid, name: '1kg', weightValue: '1', unit: 'kg', price: 800, comparePrice: 920, stock: 25),
+      ];
+    }
+    if (nameLower.contains('honey')) {
+      return [
+        ProductVariantModel(id: 301, productId: pid, name: '250ml', weightValue: '250', unit: 'ml', price: 150, comparePrice: 180, stock: 30),
+        ProductVariantModel(id: 302, productId: pid, name: '500ml', weightValue: '500', unit: 'ml', price: 280, comparePrice: 320, stock: 25, isDefault: true),
+        ProductVariantModel(id: 303, productId: pid, name: '1 Litre', weightValue: '1', unit: 'litre', price: 520, comparePrice: 600, stock: 15),
+      ];
+    }
+    if (nameLower.contains('milk')) {
+      return [
+        ProductVariantModel(id: 501, productId: pid, name: '500 ml', weightValue: '500', unit: 'ml', price: basePrice > 0 ? basePrice : 44, comparePrice: 50, stock: 120, isDefault: true),
+        ProductVariantModel(id: 502, productId: pid, name: '1 Litre', weightValue: '1', unit: 'litre', price: basePrice > 0 ? (basePrice * 1.85).roundToDouble() : 82, comparePrice: 90, stock: 150),
+      ];
+    }
+    if (nameLower.contains('ghee')) {
+      return [
+        ProductVariantModel(id: 601, productId: pid, name: '250 ml', weightValue: '250', unit: 'ml', price: 280, comparePrice: 320, stock: 40),
+        ProductVariantModel(id: 602, productId: pid, name: '500 ml', weightValue: '500', unit: 'ml', price: basePrice > 0 ? basePrice : 520, comparePrice: 600, stock: 45, isDefault: true),
+        ProductVariantModel(id: 603, productId: pid, name: '1 Litre', weightValue: '1', unit: 'litre', price: 990, comparePrice: 1150, stock: 20),
+      ];
+    }
+    if (nameLower.contains('paneer') || nameLower.contains('tofu')) {
+      return [
+        ProductVariantModel(id: 701, productId: pid, name: '200 g', weightValue: '200', unit: 'g', price: basePrice > 0 ? basePrice : 82, comparePrice: 95, stock: 60, isDefault: true),
+        ProductVariantModel(id: 702, productId: pid, name: '500 g', weightValue: '500', unit: 'g', price: basePrice > 0 ? (basePrice * 2.3).roundToDouble() : 190, comparePrice: 230, stock: 40),
+        ProductVariantModel(id: 703, productId: pid, name: '1 kg', weightValue: '1', unit: 'kg', price: basePrice > 0 ? (basePrice * 4.4).roundToDouble() : 360, comparePrice: 440, stock: 20),
+      ];
+    }
+
+    // Default variant
+    final defaultWeight = weight.isNotEmpty ? weight : 'Standard';
+    return [
+      ProductVariantModel(id: 1, productId: pid, name: defaultWeight, weightValue: defaultWeight, unit: 'unit', price: basePrice, stock: 50, isDefault: true),
+    ];
   }
 
   Map<String, dynamic> toJson() {
@@ -64,6 +203,7 @@ class ProductModel {
       'image': image,
       'description': description,
       'status': status,
+      'variants': variants.map((v) => v.toJson()).toList(),
     };
   }
 
@@ -72,10 +212,8 @@ class ProductModel {
     if (image!.startsWith('http://') || image!.startsWith('https://')) {
       return image!;
     }
-    // Remove /api suffix from base url to serve static files from server root
     final serverRoot = ApiEndpoints.baseUrl.replaceAll('/api', '');
     final cleanPath = image!.startsWith('/') ? image! : '/$image';
     return '$serverRoot$cleanPath';
   }
 }
-

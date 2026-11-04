@@ -102,13 +102,31 @@ class OrderSuccessScreen extends StatelessWidget {
                     const SizedBox(height: 14),
 
                     // Description
-                    const Text(
-                      'Your order has been confirmed.\nWe will notify you once it\'s shipped.',
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDF7EB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFC8DBBF)),
+                      ),
+                      child: const Text(
+                        'Payment details submitted successfully.\nYour payment is awaiting verification by farm operations.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Total: ₹${order.totalPrice.toStringAsFixed(0)} • Method: ${order.paymentMethod}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.textMid,
-                        fontSize: 13.5,
-                        height: 1.45,
+                        fontSize: 12.5,
                       ),
                     ),
 

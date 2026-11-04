@@ -96,10 +96,13 @@ class CartNotifier extends StateNotifier<CartState> {
     return 0;
   }
 
-  void addToCart(ProductModel product, {int quantity = 1, String? variant}) {
+  void addToCart(ProductModel product, {int quantity = 1, String? variant, ProductVariantModel? variantModel}) {
     final list = [...state.items];
     final targetId = product.id.toString();
-    final idx = list.indexWhere((i) => i.product.id.toString() == targetId && i.selectedVariant == variant);
+    final effectiveVariantName = variantModel?.name ?? variant ?? (product.variants.isNotEmpty ? product.defaultVariant?.name : null);
+    final effectivePrice = variantModel?.price ?? (variantModel != null ? variantModel.price : product.price);
+
+    final idx = list.indexWhere((i) => i.product.id.toString() == targetId && i.selectedVariant == effectiveVariantName);
 
     if (idx != -1) {
       final existing = list[idx];
@@ -107,12 +110,16 @@ class CartNotifier extends StateNotifier<CartState> {
         product: existing.product,
         quantity: existing.quantity + quantity,
         selectedVariant: existing.selectedVariant,
+        variant: variantModel ?? existing.variant,
+        overridePrice: effectivePrice,
       );
     } else {
       list.add(CartItemModel(
         product: product,
         quantity: quantity,
-        selectedVariant: variant,
+        selectedVariant: effectiveVariantName,
+        variant: variantModel,
+        overridePrice: effectivePrice,
       ));
     }
 
