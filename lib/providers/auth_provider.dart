@@ -76,6 +76,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isLoading: false,
         );
         FirebaseNotificationService.syncUserToken(user.id);
+        FirebaseNotificationService.showLocalAlert(
+          title: 'Welcome back to Thulirva!',
+          body: 'Your shopping experience is waiting for you. Continue where you left off!',
+          payload: {'type': 'welcome_back'},
+        );
         return true;
       } else {
         state = state.copyWith(
@@ -131,6 +136,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
             isLoading: false,
           );
           FirebaseNotificationService.syncUserToken(user.id);
+          if (!StorageService.hasReceivedFirstWelcome()) {
+            await StorageService.setFirstWelcomeReceived(true);
+            FirebaseNotificationService.showLocalAlert(
+              title: 'Welcome to Thulirva!',
+              body: "We're happy to have you with us. Explore our products and enjoy shopping!",
+              payload: {'type': 'welcome'},
+            );
+          }
           return true;
         } else {
           final msg = (data is Map ? data['message'] : null) ?? 'Registration failed';
@@ -242,6 +255,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    FirebaseNotificationService.disassociateUserToken();
     await StorageService.clearAuthSession();
     state = AuthState();
   }

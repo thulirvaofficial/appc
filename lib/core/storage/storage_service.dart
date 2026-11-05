@@ -14,6 +14,7 @@ class StorageService {
   static const String _keyUser = 'thulirva_cached_user';
   static const String _keyCart = 'thulirva_mobile_cart';
   static const String _keyPushToken = 'thulirva_fcm_token';
+  static const String _keyFirstWelcome = 'thulirva_first_welcome_sent';
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -83,6 +84,15 @@ class StorageService {
 
   static String? getPushToken() {
     return _prefs?.getString(_keyPushToken);
+  }
+
+  // First Welcome Notification Flag
+  static bool hasReceivedFirstWelcome() {
+    return _prefs?.getBool(_keyFirstWelcome) ?? false;
+  }
+
+  static Future<void> setFirstWelcomeReceived(bool val) async {
+    await _prefs?.setBool(_keyFirstWelcome, val);
   }
 
   // Cart

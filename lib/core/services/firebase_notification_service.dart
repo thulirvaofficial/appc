@@ -221,6 +221,59 @@ class FirebaseNotificationService {
     } catch (_) {}
   }
 
+  /// Disassociate token on logout
+  static Future<void> disassociateUserToken() async {
+    try {
+      final token = await _messaging.getToken();
+      if (token != null && token.isNotEmpty) {
+        final apiClient = ApiClient();
+        await apiClient.post(
+          ApiEndpoints.registerDeviceToken,
+          data: {
+            'token': token,
+            'platform': 'android',
+            'user_id': null,
+            'role': 'guest',
+          },
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Trigger immediate high-importance heads-up notification (welcome, orders, etc.)
+  static Future<void> showLocalAlert({
+    required String title,
+    required String body,
+    Map<String, dynamic>? payload,
+  }) async {
+    try {
+      final id = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+      await _localNotifications.show(
+        id,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDesc,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: payload != null ? jsonEncode(payload) : null,
+      );
+    } catch (_) {}
+  }
+
   /// Handle Foreground Push Messages
   static void _handleForegroundMessage(RemoteMessage message) {
     final msgId = message.messageId ?? '${message.sentTime?.millisecondsSinceEpoch}_${message.data.hashCode}';
