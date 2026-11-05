@@ -169,28 +169,12 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
         final list = (data['subscriptions'] as List)
             .map((s) => SubscriptionModel.fromJson(s as Map<String, dynamic>))
             .toList();
-        if (list.isNotEmpty) {
-          state = state.copyWith(subscriptions: list, isLoading: false);
-          return;
-        }
-      }
-    } catch (_) {}
-
-    // Fallback: fetch live active subscriptions from general endpoint
-    try {
-      final api = ref.read(apiClientProvider);
-      final resAll = await api.get(ApiEndpoints.subscriptions);
-      final dataAll = resAll.data;
-      if (dataAll is Map && dataAll['success'] == true && dataAll['subscriptions'] != null) {
-        final allList = (dataAll['subscriptions'] as List)
-            .map((s) => SubscriptionModel.fromJson(s as Map<String, dynamic>))
-            .toList();
-        state = state.copyWith(subscriptions: allList, isLoading: false);
+        state = state.copyWith(subscriptions: list, isLoading: false);
         return;
       }
     } catch (_) {}
 
-    state = state.copyWith(isLoading: false);
+    state = state.copyWith(subscriptions: [], isLoading: false);
   }
 
   Future<bool> createSubscription(Map<String, dynamic> payload) async {
