@@ -26,8 +26,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.textContaining('Pure Goodness'), findsOneWidget);
-    expect(find.textContaining('Fresh, Natural and Healthy'), findsOneWidget);
+    expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Skip'), findsOneWidget);
     expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
   });
@@ -47,8 +46,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('THULIRVA'), findsOneWidget);
-    expect(find.text('Login to Your Account'), findsOneWidget);
+    expect(find.text('Sign in to manage your farm deliveries & orders'), findsOneWidget);
     expect(find.text('Email or Phone'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);

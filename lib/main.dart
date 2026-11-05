@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/services/firebase_notification_service.dart';
 import 'core/storage/storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/splash/splash_screen.dart';
@@ -10,6 +11,9 @@ void main() async {
 
   // Initialize Local Storage Services (SharedPreferences & SecureStorage)
   await StorageService.init();
+
+  // Initialize Firebase Cloud Messaging & Push Notifications
+  await FirebaseNotificationService.initialize();
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
@@ -33,6 +37,7 @@ class ThulirvaCustomerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       title: 'THULIRVA',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

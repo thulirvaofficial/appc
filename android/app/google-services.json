@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "240313377506",
+    "project_id": "thulirva-e9697",
+    "storage_bucket": "thulirva-e9697.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:240313377506:android:994cd2f409a2a5438974bb",
+        "android_client_info": {
+          "package_name": "com.thulirva.thulirva_admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW5QFy5lco2n9Sgnh2COTNqsMMMNe_6kg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:240313377506:android:60893753795715008974bb",
+        "android_client_info": {
+          "package_name": "com.thulirva.thulirva_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW5QFy5lco2n9Sgnh2COTNqsMMMNe_6kg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+

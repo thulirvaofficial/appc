@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/my_orders_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 import '../widgets/thulirva_app_bar.dart';
 import '../widgets/thulirva_text_field.dart';
 import '../../core/services/notification_permission_service.dart';
@@ -304,6 +305,21 @@ class ProfileScreen extends ConsumerWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const MyOrdersScreen()),
+                    );
+                  }
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.calendar_month_outlined,
+                title: 'My Subscriptions',
+                subtitle: 'Active daily milk & dairy plans',
+                onTap: () {
+                  if (onSelectTab != null) {
+                    onSelectTab!(2); // Subscriptions is tab 2
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SubscriptionsScreen(initialTabIndex: 1)),
                     );
                   }
                 },

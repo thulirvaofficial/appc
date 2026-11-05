@@ -66,4 +66,5 @@ class ApiEndpoints {
   static const String readNotification = '/notifications';
   static const String markNotificationRead = '/notifications';
   static const String registerPushToken = '/notifications/register-token';
+  static const String registerDeviceToken = '/notifications/register-token';
 }

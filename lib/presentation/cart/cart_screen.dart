@@ -173,15 +173,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         borderRadius: BorderRadius.circular(28),
                       ),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Proceed to Checkout • ₹${cartState.grandTotal.toStringAsFixed(0)}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.2),
+                          'Proceed to Checkout →',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.2),
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward, size: 18),
                       ],
                     ),
                   ),
@@ -356,7 +354,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       final variantText = (item.selectedVariant != null && item.selectedVariant!.isNotEmpty)
           ? item.selectedVariant!
           : (prod.weight.isNotEmpty ? prod.weight : 'Standard');
-      final displayPrice = item.totalPrice > 0 ? item.totalPrice : (item.overridePrice ?? prod.price);
+      final displayPrice = item.unitPrice > 0 ? item.unitPrice : (item.overridePrice ?? prod.price);
       final subtitle = (prod.description != null && prod.description!.trim().isNotEmpty)
           ? prod.description!.trim()
           : (displayName.toLowerCase().contains('ghee')

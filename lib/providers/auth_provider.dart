@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/api_endpoints.dart';
+import '../core/services/firebase_notification_service.dart';
 import '../core/storage/storage_service.dart';
 import '../data/models/user_model.dart';
 import 'api_provider.dart';
@@ -74,6 +75,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isAuthenticated: true,
           isLoading: false,
         );
+        FirebaseNotificationService.syncUserToken(user.id);
         return true;
       } else {
         state = state.copyWith(
@@ -128,6 +130,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             isAuthenticated: true,
             isLoading: false,
           );
+          FirebaseNotificationService.syncUserToken(user.id);
           return true;
         } else {
           final msg = (data is Map ? data['message'] : null) ?? 'Registration failed';

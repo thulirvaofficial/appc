@@ -13,6 +13,7 @@ import '../cart/cart_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../products/products_list_screen.dart';
 import '../products/product_details_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/notification_permission_modal.dart';
 import '../../core/services/notification_permission_service.dart';
@@ -333,7 +334,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildFeatureItem(Icons.schedule, 'Daily\nDelivery'),
-                          _buildFeatureItem(Icons.calendar_month, 'Flexible\nSubscription'),
+                          _buildFeatureItem(
+                            Icons.calendar_month,
+                            'Flexible\nSubscription',
+                            onTap: () {
+                              if (widget.onNavigateToTab != null) {
+                                widget.onNavigateToTab!(2);
+                              } else {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()));
+                              }
+                            },
+                          ),
                           _buildFeatureItem(Icons.verified_outlined, 'Quality\nAssured'),
                           _buildFeatureItem(Icons.nature_outlined, 'Farm\nto Home'),
                         ],
@@ -454,7 +465,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       // Subscription Promo Card
                       GestureDetector(
-                        onTap: () => widget.onNavigateToTab?.call(2), // Switch to Subscription tab
+                        onTap: () {
+                          if (widget.onNavigateToTab != null) {
+                            widget.onNavigateToTab!(2);
+                          } else {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()));
+                          }
+                        },
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
@@ -605,37 +622,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildFeatureItem(IconData icon, String text) {
-    return Container(
-      width: 78,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5EDE2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.forestGreen, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF3B5B44),
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              height: 1.15,
+  Widget _buildFeatureItem(IconData icon, String text, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 78,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5EDE2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.forestGreen, size: 20),
+            const SizedBox(height: 4),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF3B5B44),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

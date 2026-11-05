@@ -13,20 +13,26 @@ import 'subscribe_modal.dart';
 
 class SubscriptionsScreen extends ConsumerStatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
+  final int initialTabIndex;
 
-  const SubscriptionsScreen({super.key, this.onNavigateToTab});
+  const SubscriptionsScreen({
+    super.key,
+    this.onNavigateToTab,
+    this.initialTabIndex = 0,
+  });
 
   @override
   ConsumerState<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
 }
 
 class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
-  int _selectedTabIndex = 0; // 0: Subscriptions (Plans), 1: My Subscriptions
+  late int _selectedTabIndex;
   String _selectedCategory = 'All';
 
   @override
   void initState() {
     super.initState();
+    _selectedTabIndex = widget.initialTabIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(subscriptionProvider.notifier).fetchPlans();
       ref.read(subscriptionProvider.notifier).fetchSubscriptions();

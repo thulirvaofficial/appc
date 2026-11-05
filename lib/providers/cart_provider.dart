@@ -143,6 +143,8 @@ class CartNotifier extends StateNotifier<CartState> {
         product: existing.product,
         quantity: newQuantity,
         selectedVariant: existing.selectedVariant,
+        variant: existing.variant,
+        overridePrice: existing.overridePrice,
       );
       state = state.copyWith(items: list);
       _saveCart();

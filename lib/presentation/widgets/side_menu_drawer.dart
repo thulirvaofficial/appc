@@ -10,6 +10,7 @@ import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/my_orders_screen.dart';
 import '../profile/about_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 import '../profile/addresses_screen.dart';
 import '../profile/offers_screen.dart';
 
@@ -106,6 +107,17 @@ class SideMenuDrawer extends ConsumerWidget {
                     onTap: () {
                       Navigator.pop(context);
                       onSelectTab?.call(2);
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.event_repeat_outlined,
+                    title: 'My Subscriptions',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SubscriptionsScreen(initialTabIndex: 1)),
+                      );
                     },
                   ),
                   _buildMenuItem(
