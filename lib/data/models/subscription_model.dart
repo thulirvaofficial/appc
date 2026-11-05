@@ -105,7 +105,7 @@ class SubscriptionModel {
       startDateObj = DateTime.tryParse(startStr);
     } catch (_) {}
 
-    final duration = json['duration_days'] ?? (json['time_period']?.toString().contains('15') == true ? 15 : 30);
+    final int duration = int.tryParse(json['duration_days']?.toString() ?? '') ?? (json['time_period']?.toString().contains('15') == true ? 15 : 30);
     DateTime? expiryDateObj;
     if (json['expiry_date'] != null) {
       expiryDateObj = DateTime.tryParse(json['expiry_date']);

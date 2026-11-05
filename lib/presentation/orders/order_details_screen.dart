@@ -141,7 +141,7 @@ class OrderDetailsScreen extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('• $name x $qty', style: AppTypography.bodyMedium),
+                            Expanded(child: Text('• $name x $qty', style: AppTypography.bodyMedium, maxLines: 2, overflow: TextOverflow.ellipsis)), const SizedBox(width: 8),
                             Text('₹$price', style: const TextStyle(fontWeight: FontWeight.w700)),
                           ],
                         ),

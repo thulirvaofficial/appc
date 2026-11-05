@@ -320,7 +320,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  // Cart Item Card (Safe, bounded, elegant)
+  // Cart Item Card (Safe, bounded, elegant, pixel-perfect to design)
   Widget _buildCartItemCard(CartItemModel item, CartNotifier notifier) {
     final prod = item.product;
     final displayName = prod.name.trim().isNotEmpty ? prod.name : 'Farm Fresh Item';
@@ -352,12 +352,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Left: Product Image in soft pastel green container
           Container(
-            width: 74,
-            height: 74,
+            width: 82,
+            height: 82,
             decoration: BoxDecoration(
               color: const Color(0xFFEDF7EB),
               borderRadius: BorderRadius.circular(14),
@@ -367,111 +367,125 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Center Details
+          // Details & Actions
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    color: AppColors.forestGreen,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                // Title and Heart Wishlist Icon
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        style: const TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4, bottom: 2),
+                      child: Icon(Icons.favorite_border, color: AppColors.forestGreen, size: 20),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Color(0xFF6E8072), fontSize: 11),
+                  style: const TextStyle(color: Color(0xFF6E8072), fontSize: 11.5),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDF7EB),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        variantText,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.forestGreen,
-                        ),
-                      ),
+
+                // Variant Pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF7EB),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    variantText,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.forestGreen,
                     ),
-                    const SizedBox(width: 8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Price & Capsule Quantity Selector Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                     Text(
-                      '₹${displayPrice.toStringAsFixed(0)}',
+                      '₹' + displayPrice.toStringAsFixed(0),
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: AppColors.forestGreen,
+                      ),
+                    ),
+                    // Capsule Quantity Selector
+                    Container(
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDF7EB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFD2E8CB)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              notifier.updateQuantity(prod.id, item.quantity - 1, variant: item.selectedVariant);
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: const SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: Center(
+                                child: Icon(Icons.remove, size: 14, color: AppColors.forestGreen),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              '${item.quantity}',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.forestGreen),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              notifier.addToCart(prod, variant: item.selectedVariant);
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: const SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: Center(
+                                child: Icon(Icons.add, size: 14, color: AppColors.forestGreen),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-
-          // Right: Delete Trash + Capsule Quantity Selector
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              InkWell(
-                onTap: () => notifier.removeFromCart(prod.id, variant: item.selectedVariant),
-                borderRadius: BorderRadius.circular(8),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.delete_outline, size: 20, color: Color(0xFFD32F2F)),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEDF7EB),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFD2E8CB)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      onTap: () => notifier.updateQuantity(prod.id, item.quantity - 1, variant: item.selectedVariant),
-                      borderRadius: BorderRadius.circular(16),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Icon(Icons.remove, size: 14, color: AppColors.forestGreen),
-                      ),
-                    ),
-                    Text(
-                      '${item.quantity}',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.forestGreen),
-                    ),
-                    InkWell(
-                      onTap: () => notifier.addToCart(prod, variant: item.selectedVariant),
-                      borderRadius: BorderRadius.circular(16),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Icon(Icons.add, size: 14, color: AppColors.forestGreen),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ],
       ),
