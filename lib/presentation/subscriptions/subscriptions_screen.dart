@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/subscription_model.dart';
@@ -20,6 +22,16 @@ class SubscriptionsScreen extends ConsumerStatefulWidget {
 
 class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
   int _selectedTabIndex = 0; // 0: Subscriptions (Plans), 1: My Subscriptions
+  String _selectedCategory = 'All';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(subscriptionProvider.notifier).fetchPlans();
+      ref.read(subscriptionProvider.notifier).fetchSubscriptions();
+    });
+  }
 
   void _openSubscribeModalWithPlan(SubscriptionPlanModel plan) {
     showModalBottomSheet(
@@ -285,7 +297,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
               ),
               const SizedBox(height: 3),
               const Text(
-                'Select a plan that fits your daily needs',
+                'Direct from farm • Daily pure milk & dairy deliveries',
                 style: TextStyle(
                   color: Color(0xFF6E8072),
                   fontSize: 12.5,
@@ -293,6 +305,26 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Category Filter Chips
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildCategoryChip('All', 'All Plans'),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Milk', 'Fresh Cow Milk'),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Paneer', 'Paneer & Ghee'),
+                const SizedBox(width: 8),
+                _buildCategoryChip('Curd', 'Thick Curd'),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -305,12 +337,21 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
 
             if (subState.isLoading && plans.isEmpty) {
               return const SizedBox(
-                height: 360,
+                height: 395,
                 child: Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
               );
             }
 
-            if (plans.isEmpty) {
+            final filteredPlans = plans.where((p) {
+              if (_selectedCategory == 'All') return true;
+              final name = p.productName.toLowerCase();
+              if (_selectedCategory == 'Milk') return name.contains('milk');
+              if (_selectedCategory == 'Paneer') return name.contains('paneer') || name.contains('ghee');
+              if (_selectedCategory == 'Curd') return name.contains('curd');
+              return true;
+            }).toList();
+
+            if (filteredPlans.isEmpty) {
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(24),
@@ -320,10 +361,16 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                     children: [
                       const Icon(Icons.calendar_month_outlined, color: AppColors.forestGreen, size: 36),
                       const SizedBox(height: 8),
-                      const Text('Loading fresh subscription plans...', style: TextStyle(color: Color(0xFF6E8072), fontSize: 13)),
+                      Text(
+                        plans.isEmpty ? 'Loading fresh subscription plans...' : 'No plans in this category',
+                        style: const TextStyle(color: Color(0xFF6E8072), fontSize: 13),
+                      ),
                       TextButton(
-                        onPressed: () => ref.read(subscriptionProvider.notifier).fetchPlans(),
-                        child: const Text('Refresh Plans', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700)),
+                        onPressed: () {
+                          setState(() => _selectedCategory = 'All');
+                          ref.read(subscriptionProvider.notifier).fetchPlans();
+                        },
+                        child: const Text('View All Plans', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -332,14 +379,14 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
             }
 
             return SizedBox(
-              height: 380,
+              height: 395,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: plans.length,
+                itemCount: filteredPlans.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 14),
                 itemBuilder: (ctx, idx) {
-                  final plan = plans[idx];
+                  final plan = filteredPlans[idx];
                   final isPopular = plan.badge.toLowerCase().contains('popular') || idx == 0;
                   final asset = plan.productName.toLowerCase().contains('1')
                       ? 'assets/images/sub_weekly_bottles.png'
@@ -434,6 +481,42 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     );
   }
 
+  Widget _buildCategoryChip(String key, String label) {
+    final isSel = _selectedCategory == key;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = key),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSel ? AppColors.forestGreen : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSel ? AppColors.forestGreen : const Color(0xFFD6E2D5),
+            width: isSel ? 1.5 : 1,
+          ),
+          boxShadow: isSel
+              ? [
+                  BoxShadow(
+                    color: AppColors.forestGreen.withValues(alpha: 0.18),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSel ? Colors.white : AppColors.forestGreen,
+            fontSize: 12.5,
+            fontWeight: isSel ? FontWeight.w700 : FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDynamicPlanCard({
     required SubscriptionPlanModel plan,
     required bool isMostPopular,
@@ -441,8 +524,12 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     required VoidCallback onSubscribe,
     required VoidCallback onAddToCart,
   }) {
+    final hasDiscount = plan.discountPercent > 0;
+    final hasOriginalPrice = plan.originalPrice != null && plan.originalPrice! > plan.price;
+    final networkUrl = ApiEndpoints.resolveImageUrl(plan.productImage ?? '');
+
     return Container(
-      width: 245,
+      width: 250,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -463,36 +550,112 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 125,
+            height: 135,
             width: double.infinity,
             color: const Color(0xFFFAF7EE),
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: Image.asset(
-                    asset,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.local_drink, color: AppColors.forestGreen, size: 40),
+                  child: networkUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: networkUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: const Color(0xFFFAF7EE),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => Image.asset(
+                            asset,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.local_drink, color: AppColors.forestGreen, size: 40),
+                            ),
+                          ),
+                        )
+                      : Image.asset(
+                          asset,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.local_drink, color: AppColors.forestGreen, size: 40),
+                          ),
+                        ),
+                ),
+                // Gradient scrim on top for badge contrast
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 48,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.35),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                if (isMostPopular)
+                // Badge (Most Popular / Family Pack / etc)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: AppColors.forestGreen,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      plan.badge.isNotEmpty ? plan.badge : 'Popular',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                // Discount Badge on Right
+                if (hasDiscount)
                   Positioned(
-                    top: 10,
-                    left: 10,
+                    top: 8,
+                    right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                       decoration: BoxDecoration(
-                        color: AppColors.forestGreen,
+                        color: const Color(0xFFE5C97A),
                         borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.18),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Text(
-                        plan.badge.isNotEmpty ? plan.badge : 'Most Popular',
+                        '${plan.discountPercent}% OFF',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.forestGreen,
                           fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
@@ -522,7 +685,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
@@ -535,8 +698,21 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (hasOriginalPrice) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '₹${plan.originalPrice!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Color(0xFF9E9E9E),
+                          fontSize: 12,
+                          decoration: TextDecoration.lineThrough,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 4),
                     Text(
-                      ' / ${plan.durationDays} days',
+                      ' / ${plan.durationDays}d',
                       style: const TextStyle(
                         color: Color(0xFF6E8072),
                         fontSize: 11,
@@ -657,6 +833,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       itemBuilder: (context, index) {
         final sub = subs[index];
         final isActive = sub.status.toLowerCase() == 'active';
+        final subImg = ApiEndpoints.resolveImageUrl(sub.productImage ?? '');
 
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
@@ -677,16 +854,42 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      color: const Color(0xFFFAF7EE),
+                      child: subImg.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: subImg,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => const Icon(Icons.local_drink, color: AppColors.forestGreen, size: 28),
+                            )
+                          : const Icon(Icons.local_drink, color: AppColors.forestGreen, size: 28),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      sub.productName.isNotEmpty ? sub.productName : 'Fresh Cow Milk',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: AppColors.forestGreen,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sub.productName.isNotEmpty ? sub.productName : 'Fresh Cow Milk',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15.5,
+                            color: AppColors.forestGreen,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${sub.frequency} • Qty: ${sub.quantity}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF6E8072), fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ),
                   Container(
@@ -706,28 +909,79 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.schedule, size: 14, color: Color(0xFF6E8072)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${sub.frequency} | Qty: ${sub.quantity}',
-                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF6E8072)),
-                  ),
-                ],
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FBF8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE5EDE2)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 14, color: AppColors.forestGreen),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Slot: ${sub.deliverySlot}',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: AppColors.forestGreen),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Started: ${sub.startDate} • ${sub.daysRemaining} days left',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (sub.address.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 14, color: AppColors.forestGreen),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              sub.address,
+                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E8072)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '₹${sub.totalPrice.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.forestGreen,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Total Plan Price', style: TextStyle(fontSize: 10.5, color: Color(0xFF6E8072))),
+                      Text(
+                        '₹${sub.totalPrice.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.forestGreen,
+                        ),
+                      ),
+                    ],
                   ),
                   Row(
                     children: [
@@ -740,9 +994,9 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                             foregroundColor: AppColors.pending,
                             side: const BorderSide(color: AppColors.pending),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           ),
-                          child: const Text('Pause', style: TextStyle(fontSize: 12)),
+                          child: const Text('Pause', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                         )
                       else
                         ElevatedButton(
@@ -753,9 +1007,9 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                             backgroundColor: AppColors.forestGreen,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           ),
-                          child: const Text('Resume', style: TextStyle(fontSize: 12)),
+                          child: const Text('Resume', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                     ],
                   ),

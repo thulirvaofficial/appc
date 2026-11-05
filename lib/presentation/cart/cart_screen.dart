@@ -7,6 +7,7 @@ import '../../data/models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
 import '../checkout/checkout_screen.dart';
+import 'apply_coupon_screen.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   final VoidCallback? onContinueShopping;
@@ -568,50 +569,78 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFAF7EE),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.forestGreen, width: 1.2),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.percent, color: AppColors.forestGreen, size: 18),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Apply Coupon',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: AppColors.forestGreen),
+          // Header Row (Tapping opens dedicated ApplyCouponScreen)
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ApplyCouponScreen()),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAF7EE),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.forestGreen, width: 1.2),
                       ),
-                      Text(
-                        'Enter promo code for instant farm discount',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF6E8072)),
+                      child: const Center(
+                        child: Icon(Icons.percent, color: AppColors.forestGreen, size: 18),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-              if (hasCoupon)
-                TextButton(
-                  onPressed: () => notifier.removeCoupon(),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  child: const Text('Remove', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700, fontSize: 12)),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Apply Coupon',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: AppColors.forestGreen),
+                        ),
+                        Text(
+                          'Have a coupon code? Apply it here.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF6E8072)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-            ],
+                if (hasCoupon)
+                  TextButton(
+                    onPressed: () => notifier.removeCoupon(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Remove', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700, fontSize: 12)),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDF7EB),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Apply',
+                          style: TextStyle(color: AppColors.forestGreen, fontSize: 11.5, fontWeight: FontWeight.w800),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(Icons.chevron_right, size: 16, color: AppColors.forestGreen),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 
