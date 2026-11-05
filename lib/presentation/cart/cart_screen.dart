@@ -223,11 +223,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
                 child: ClipOval(
                   child: Image.asset(
-                    'assets/images/logo/logo.png',
+                    'assets/images/logo/logo_circle_emblem.png',
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Text('T', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.forestGreen, fontSize: 18)),
-                    ),
+                    errorBuilder: (_, __, ___) => Image.asset('assets/images/logo/logo.png', fit: BoxFit.contain),
                   ),
                 ),
               ),
