@@ -89,6 +89,16 @@ class FirebaseNotificationService {
       final androidPlatform = _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlatform != null) {
         await androidPlatform.createNotificationChannel(_channel);
+        await androidPlatform.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'thulirva_admin_channel',
+            'THULIRVA Admin Alerts',
+            description: 'Administrative and operational alerts',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
       }
 
       // 4. Request Permissions
