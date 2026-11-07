@@ -176,7 +176,12 @@ class OrderDetailsScreen extends StatelessWidget {
                   Text('Method: ${order.paymentMethod}', style: AppTypography.bodySmall),
                   if (order.transactionId != null && order.transactionId!.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text('UTR / Transaction ID: ${order.transactionId}', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.forestGreen)),
+                    Text(
+                      'UTR / Transaction ID: ${order.transactionId}',
+                      style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.forestGreen),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ],
               ),

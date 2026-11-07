@@ -132,44 +132,46 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
   }) {
     final isSelected = _currentIndex == index;
 
-    return InkWell(
-      onTap: () => _onTabTapped(index),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: isSelected
-            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFDDF0D6) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Badge(
-              isLabelVisible: badgeCount > 0,
-              backgroundColor: AppColors.cancelled,
-              label: Text(
-                '$badgeCount',
-                style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onTabTapped(index),
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFDDF0D6) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Badge(
+                isLabelVisible: badgeCount > 0,
+                backgroundColor: AppColors.cancelled,
+                label: Text(
+                  '$badgeCount',
+                  style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+                child: Icon(
+                  isSelected ? activeIcon : icon,
+                  color: isSelected ? AppColors.forestGreen : const Color(0xFF6E8072),
+                  size: 20,
+                ),
               ),
-              child: Icon(
-                isSelected ? activeIcon : icon,
-                color: isSelected ? AppColors.forestGreen : const Color(0xFF6E8072),
-                size: 21,
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                  color: isSelected ? AppColors.forestGreen : const Color(0xFF6E8072),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? AppColors.forestGreen : const Color(0xFF6E8072),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

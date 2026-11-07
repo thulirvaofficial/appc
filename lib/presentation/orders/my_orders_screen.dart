@@ -321,15 +321,21 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '₹${order.total.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.forestGreen,
+                Expanded(
+                  child: Text(
+                    '₹' + order.total.toStringAsFixed(0),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.forestGreen,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: const [
                     Text(
                       'View Details',
