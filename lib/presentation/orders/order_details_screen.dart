@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +35,8 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     '📍 Exact Doorstep',
   ];
 
+  Timer? _statusPollingTimer;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +44,30 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     if (_currentOrder.orderStatus.toLowerCase() == 'delivered') {
       _loadDeliveryDetails();
     }
+    _startLiveStatusPolling();
+  }
+
+  void _startLiveStatusPolling() {
+    // 5-second polling fallback to synchronize status with centralized backend
+    _statusPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted) return;
+      try {
+        final orderId = _currentOrder.id.toString();
+        final fresh = await ref.read(orderProvider.notifier).fetchOrderDetails(orderId);
+        if (fresh != null && mounted) {
+          final oldStatus = _currentOrder.orderStatus.toLowerCase();
+          final newStatus = fresh.orderStatus.toLowerCase();
+          if (oldStatus != newStatus || fresh.deliveryProofUrl != _currentOrder.deliveryProofUrl) {
+            setState(() {
+              _currentOrder = fresh;
+            });
+            if (newStatus == 'delivered' && (_currentOrder.deliveryProofUrl == null || _currentOrder.deliveryProofUrl!.isEmpty)) {
+              _loadDeliveryDetails();
+            }
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   Future<void> _loadDeliveryDetails() async {
@@ -59,6 +86,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
   @override
   void dispose() {
+    _statusPollingTimer?.cancel();
     _feedbackController.dispose();
     super.dispose();
   }
@@ -121,6 +149,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       case 'shipped':
       case 'out_for_delivery':
       case 'in_transit':
+      case 'picked_up':
       case 'pickup_confirmed':
         return 'Out for Delivery';
       case 'delivered':
@@ -943,9 +972,24 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                       alignment: Alignment.topRight,
                       children: [
                         InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 5.0,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Image.network(fullUrl, fit: BoxFit.contain),
+                            child: Image.network(
+                              fullUrl,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (ctx, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(child: CircularProgressIndicator(color: Colors.white));
+                              },
+                              errorBuilder: (ctx, err, stack) => Container(
+                                height: 200,
+                                color: Colors.black54,
+                                alignment: Alignment.center,
+                                child: const Text('Failed to load image preview', style: TextStyle(color: Colors.white70)),
+                              ),
+                            ),
                           ),
                         ),
                         IconButton(
@@ -966,11 +1010,61 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      loadingBuilder: (ctx, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          height: 160,
+                          color: const Color(0xFFFAF7F0),
+                          alignment: Alignment.center,
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF15803D)),
+                              ),
+                              SizedBox(height: 6),
+                              Text('Loading doorstep proof...', style: TextStyle(fontSize: 11, color: AppColors.textMid)),
+                            ],
+                          ),
+                        );
+                      },
                       errorBuilder: (ctx, err, stack) => Container(
-                        height: 120,
+                        height: 140,
                         color: const Color(0xFFFAF7F0),
+                        padding: const EdgeInsets.all(12),
                         alignment: Alignment.center,
-                        child: const Text('Proof photo verified on Thulirva network', style: TextStyle(fontSize: 12, color: AppColors.textMid)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.broken_image_rounded, size: 28, color: Color(0xFFD97706)),
+                            const SizedBox(height: 6),
+                            const Text('Proof photo verified on Thulirva network', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMid)),
+                            const SizedBox(height: 6),
+                            InkWell(
+                              onTap: () {
+                                PaintingBinding.instance.imageCache.evict(NetworkImage(fullUrl));
+                                setState(() {});
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF15803D),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.refresh_rounded, size: 14, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text('Retry', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     Positioned(
@@ -1239,7 +1333,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     int currentStep = 0;
     if (s == 'processing' || s == 'preparing') currentStep = 1;
     if (s == 'ready' || s == 'ready_for_pickup') currentStep = 2;
-    if (s == 'shipped' || s == 'out_for_delivery' || s == 'in_transit' || s == 'pickup_confirmed') currentStep = 2;
+    if (s == 'shipped' || s == 'out_for_delivery' || s == 'in_transit' || s == 'picked_up' || s == 'pickup_confirmed') currentStep = 2;
     if (s == 'delivered' || s == 'collected') currentStep = 3;
 
     final steps = isPickup

@@ -190,9 +190,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   int get _currentStageIndex {
     final s = _order.orderStatus.toLowerCase().replaceAll(' ', '_');
     if (s == 'delivered' || s == 'collected') return 3;
-    if (s == 'in_transit' || s == 'out_for_delivery') return 2;
-    if (s == 'pickup_confirmed' || s == 'pickup' || s == 'preparing') return 1;
-    return 0; // placed / assigned
+    if (s == 'out_for_delivery' || s == 'in_transit' || s == 'picked_up' || s == 'pickup_confirmed') return 2;
+    if (s == 'preparing' || s == 'processing' || s == 'assigned') return 1;
+    return 0; // placed / confirmed
   }
 
   @override
@@ -273,6 +273,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       routeProgress = 0.95;
     }
 
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       body: Stack(
@@ -315,23 +317,23 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
           // 2. Floating Top-Left Header: Back Button + Thulirva Leaf & Title + Subtitle
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 6 : 10),
             left: 16,
             child: _buildTopFloatingHeader(),
           ),
 
           // 3. Floating Top-Right Action Buttons: Search, Recenter/Settings, Layers Toggle
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 6 : 10),
             right: 16,
             child: _buildTopRightActions(),
           ),
 
           // 4. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
           Positioned(
-            top: MediaQuery.of(context).padding.top + 72,
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 58 : 72),
             left: 16,
-            width: 260,
+            width: isLandscape ? 250 : 260,
             child: _buildPartnerInfoCard(
               partnerName: partnerName,
               partnerPhone: partnerPhone,
@@ -345,9 +347,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
           // 5. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
           Positioned(
-            bottom: 24,
-            left: 16,
-            right: 16,
+            bottom: isLandscape ? 16 : 24,
+            left: isLandscape ? 278 : 16,
+            right: isLandscape ? 24 : 16,
             child: _buildBottomProgressCard(),
           ),
         ],
