@@ -230,7 +230,11 @@ class SubscriptionModel {
   }
 
   OrderModel toOrderModel() {
-    final cleanCity = address.toLowerCase().contains('thiruverkadu') ? 'Thiruverkadu' : 'Thiruverkadu';
+    final isThiruverkadu = address.toLowerCase().contains('thiruverkadu') || address.isEmpty;
+    final cleanCity = isThiruverkadu ? 'Thiruverkadu' : 'Chennai';
+    final double defaultLat = isThiruverkadu ? 13.0694 : 13.0827;
+    final double defaultLng = isThiruverkadu ? 80.1247 : 80.2707;
+
     return OrderModel(
       id: id,
       userId: userId,
@@ -239,7 +243,7 @@ class SubscriptionModel {
       customerEmail: customerEmail,
       address: address.isNotEmpty ? address : 'Door No. 12, Farm Lane, Thiruverkadu',
       city: cleanCity,
-      pincode: '600077',
+      pincode: isThiruverkadu ? '600077' : '600001',
       items: [
         {
           'name': productName,
@@ -254,14 +258,14 @@ class SubscriptionModel {
       paymentStatus: paymentStatus,
       orderStatus: status.toLowerCase() == 'active' ? 'out_for_delivery' : status,
       createdAt: startDate,
-      partnerName: 'Kumar R',
-      partnerPhone: '9840515293',
-      partnerVehicle: 'Electric Scooter • TN 09 CY 4567',
-      partnerRating: 4.8,
-      partnerLatitude: 12.8055,
-      partnerLongitude: 80.2260,
-      latitude: 12.8090,
-      longitude: 80.2280,
+      partnerName: null,
+      partnerPhone: null,
+      partnerVehicle: null,
+      partnerRating: null,
+      partnerLatitude: null,
+      partnerLongitude: null,
+      latitude: defaultLat,
+      longitude: defaultLng,
     );
   }
 

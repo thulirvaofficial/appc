@@ -13,6 +13,7 @@ import '../../core/services/routing_service.dart';
 import '../../core/utils/customer_bike_marker_generator.dart';
 import '../../data/models/order_model.dart';
 import '../../providers/order_provider.dart';
+import 'widgets/in_app_chat_sheet.dart';
 import 'widgets/thulirva_3d_isometric_city_view.dart';
 
 class CustomerLiveTrackingScreen extends ConsumerStatefulWidget {
@@ -62,6 +63,20 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     _loadRealRoadRoute();
     _initSocket();
     _startLiveTelemetrySync();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final orderId = _order.id.toString();
+        final fresh = await ref.read(orderProvider.notifier).fetchOrderTrackingDetails(orderId);
+        if (fresh != null && mounted) {
+          setState(() {
+            _order = fresh;
+          });
+          _loadCustomMarkers();
+          _loadRealRoadRoute();
+        }
+      } catch (_) {}
+    });
 
     // Allow both portrait and landscape viewing for 3D live delivery tracking
     SystemChrome.setPreferredOrientations([
@@ -266,7 +281,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     _telemetryTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) async {
       try {
         final orderId = _order.id.toString();
-        final freshOrder = await ref.read(orderProvider.notifier).fetchOrderDetails(orderId);
+        final freshOrder = await ref.read(orderProvider.notifier).fetchOrderTrackingDetails(orderId);
         if (freshOrder != null && mounted) {
           final oldLat = _order.partnerLatitude;
           final oldLng = _order.partnerLongitude;
@@ -312,15 +327,39 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   }
 
   LatLng get _resolvedCustomerPos {
-    final lat = _order.latitude ?? 12.8090;
-    final lng = _order.longitude ?? 80.2280;
-    return LatLng(lat, lng);
+    if (_order.latitude != null &&
+        _order.longitude != null &&
+        _order.latitude! != 0 &&
+        _order.longitude! != 0) {
+      return LatLng(_order.latitude!, _order.longitude!);
+    }
+    final fullText = '${_order.address} ${_order.city} ${_order.pincode}'.toLowerCase();
+    if (fullText.contains('thiruverkadu') ||
+        fullText.contains('600077') ||
+        _order.city.toLowerCase() == 'thiruverkadu' ||
+        _order.city.isEmpty) {
+      return const LatLng(13.0694, 80.1247); // Genuine Thiruverkadu, Chennai destination
+    }
+    if (fullText.contains('porur') || fullText.contains('600116')) {
+      return const LatLng(13.0382, 80.1565);
+    }
+    if (fullText.contains('kk nagar') || fullText.contains('600078')) {
+      return const LatLng(13.0410, 80.1994);
+    }
+    if (fullText.contains('padur') || fullText.contains('603103')) {
+      return const LatLng(12.8025, 80.2233);
+    }
+    return const LatLng(13.0694, 80.1247);
   }
 
-  LatLng get _resolvedRiderPos {
-    final lat = _order.partnerLatitude ?? (_resolvedCustomerPos.latitude - 0.0045);
-    final lng = _order.partnerLongitude ?? (_resolvedCustomerPos.longitude - 0.0035);
-    return LatLng(lat, lng);
+  LatLng? get _resolvedRiderPos {
+    if (_order.partnerLatitude != null &&
+        _order.partnerLongitude != null &&
+        _order.partnerLatitude! != 0 &&
+        _order.partnerLongitude! != 0) {
+      return LatLng(_order.partnerLatitude!, _order.partnerLongitude!);
+    }
+    return null; // Strictly genuine null when partner GPS is not streaming - NO FAKE OFFSETS!
   }
 
   double _calculateDistanceKm(LatLng p1, LatLng p2) {
@@ -332,35 +371,114 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   }
 
   Future<void> _callPartner(String? phone) async {
-    final raw = phone ?? '9840515293';
+    final raw = (phone != null && phone.trim().isNotEmpty) ? phone : _order.partnerPhone;
+    if (raw == null || raw.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Delivery partner phone number not assigned yet'),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+      }
+      return;
+    }
     final clean = raw.replaceAll(RegExp(r'[^0-9+]'), '');
-    final uri = Uri.parse('tel:$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    final uri = Uri(scheme: 'tel', path: clean);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      debugPrint('[CustomerTracking] Error launching dialer: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open dialer for $clean: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _openWhatsAppChat(String? phone) async {
-    final raw = phone ?? '9840515293';
+    final raw = (phone != null && phone.trim().isNotEmpty) ? phone : _order.partnerPhone;
+    if (raw == null || raw.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Delivery partner contact not available yet'),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+      }
+      return;
+    }
     final clean = raw.replaceAll(RegExp(r'[^0-9]'), '');
     final cleanNumber = clean.length == 10 ? '91$clean' : clean;
     final uri = Uri.parse('https://wa.me/$cleanNumber?text=Hello%20Thulirva%20Partner,%20regarding%20my%20order%20#${_order.formattedOrderId}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('[CustomerTracking] Error launching WhatsApp: $e');
     }
+  }
+
+  void _openChatSheet(BuildContext context, String partnerName, String? partnerPhone) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => InAppChatSheet(
+        orderId: _order.orderId.toString(),
+        partnerName: partnerName,
+        partnerPhone: partnerPhone,
+        socket: _socket,
+        onCall: () => _callPartner(partnerPhone),
+      ),
+    );
   }
 
   void _recenterOnRider() {
     if (_mapController == null) return;
-    _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: _resolvedRiderPos,
-          zoom: 17.5,
-          tilt: _currentTilt,
-          bearing: _currentHeading,
+    final rider = _resolvedRiderPos;
+    if (rider != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: rider,
+            zoom: 17.5,
+            tilt: _currentTilt,
+            bearing: _currentHeading,
+          ),
         ),
-      ),
+      );
+    } else {
+      _recenterOverview();
+    }
+  }
+
+  void _recenterOverview() {
+    if (_mapController == null) return;
+    final customer = _resolvedCustomerPos;
+    final rider = _resolvedRiderPos ?? _padurHubPos;
+
+    final south = math.min(customer.latitude, rider.latitude);
+    final north = math.max(customer.latitude, rider.latitude);
+    final west = math.min(customer.longitude, rider.longitude);
+    final east = math.max(customer.longitude, rider.longitude);
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(south - 0.03, west - 0.03),
+      northeast: LatLng(north + 0.03, east + 0.03),
+    );
+
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 50),
     );
   }
 
@@ -370,11 +488,12 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       _currentTilt = _is3dView ? 52.0 : 0.0;
     });
     if (_mapController != null) {
+      final target = _resolvedRiderPos ?? _resolvedCustomerPos;
       _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
-            target: _resolvedRiderPos,
-            zoom: _is3dView ? 17.5 : 16.0,
+            target: target,
+            zoom: _is3dView ? 17.5 : 15.0,
             tilt: _currentTilt,
             bearing: _is3dView ? _currentHeading : 0.0,
           ),
@@ -396,16 +515,31 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     final partner = _order;
     final partnerName = (partner.partnerName != null && partner.partnerName!.trim().isNotEmpty)
         ? partner.partnerName!
-        : 'Kumar R';
-    final partnerPhone = partner.partnerPhone ?? '9840515293';
-    final partnerVehicle = partner.partnerVehicle ?? 'Electric Scooter • TN 09 CY 4567';
-    final partnerPhoto = partner.partnerPhoto ?? '/uploads/partners/kumar_profile.png';
-    final rating = partner.partnerRating ?? 4.8;
+        : 'Assigned Partner';
+    final partnerPhone = partner.partnerPhone;
+    final partnerVehicle = partner.partnerVehicle ?? 'Thulirva Eco-Express';
+    final partnerPhoto = partner.partnerPhoto ?? '';
+    final rating = partner.partnerRating ?? 5.0;
 
     final riderPos = _resolvedRiderPos;
     final customerPos = _resolvedCustomerPos;
-    final distanceKm = _calculateDistanceKm(riderPos, customerPos);
-    final etaMins = (distanceKm * 4.5).clamp(3, 30).round();
+
+    final double distanceKm;
+    final int etaMins;
+    final String etaSnippet;
+    final String statusDisplay;
+
+    if (riderPos != null) {
+      distanceKm = _calculateDistanceKm(riderPos, customerPos);
+      etaMins = (distanceKm * 1.6).clamp(3, 120).round();
+      etaSnippet = 'ETA: $etaMins min (${distanceKm.toStringAsFixed(1)} km)';
+      statusDisplay = 'On the way';
+    } else {
+      distanceKm = _calculateDistanceKm(_padurHubPos, customerPos);
+      etaMins = (distanceKm * 1.6).round();
+      etaSnippet = 'ETA: ~$etaMins min from Hub (${distanceKm.toStringAsFixed(1)} km)';
+      statusDisplay = 'Partner assigned • Connecting GPS';
+    }
 
     final customerArea = (_order.city.isNotEmpty
             ? _order.city
@@ -436,25 +570,26 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           snippet: '${_order.address}, ${_order.city}',
         ),
       ),
-      // 3D Animated Scooty Rider
-      Marker(
-        markerId: const MarkerId('scooty_rider'),
-        position: riderPos,
-        icon: _riderMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        rotation: _currentHeading,
-        flat: true,
-        anchor: const Offset(0.5, 0.5),
-        infoWindow: InfoWindow(
-          title: '🛵 $partnerName (En Route)',
-          snippet: 'ETA: $etaMins min (${distanceKm.toStringAsFixed(1)} km)',
+      // 3D Animated Scooty Rider (Displayed strictly when genuine GPS is streaming)
+      if (riderPos != null)
+        Marker(
+          markerId: const MarkerId('scooty_rider'),
+          position: riderPos,
+          icon: _riderMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          rotation: _currentHeading,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
+          infoWindow: InfoWindow(
+            title: '🛵 $partnerName (En Route)',
+            snippet: etaSnippet,
+          ),
         ),
-      ),
     };
 
     // 2. Glowing Green Real Road Network Polyline
     final activeRoute = _roadPolylinePoints.isNotEmpty
         ? _roadPolylinePoints
-        : [_padurHubPos, riderPos, customerPos];
+        : (riderPos != null ? [_padurHubPos, riderPos, customerPos] : [_padurHubPos, customerPos]);
 
     final polylines = <Polyline>{
       // Outer Glowing Mint Green Ribbon
@@ -511,8 +646,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               child: GoogleMap(
                 mapType: _currentMapType,
                 initialCameraPosition: CameraPosition(
-                  target: riderPos,
-                  zoom: 17.5,
+                  target: riderPos ?? customerPos,
+                  zoom: riderPos != null ? 17.5 : 12.0,
                   tilt: _currentTilt,
                   bearing: _currentHeading,
                 ),
@@ -527,7 +662,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                 buildingsEnabled: true,
                 onMapCreated: (ctrl) {
                   _mapController = ctrl;
-                  _recenterOnRider();
+                  if (riderPos != null) {
+                    _recenterOnRider();
+                  } else {
+                    _recenterOverview();
+                  }
                 },
               ),
             ),
@@ -569,8 +708,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               partnerVehicle: partnerVehicle,
               partnerPhoto: partnerPhoto,
               rating: rating,
-              etaMins: etaMins,
-              distanceKm: distanceKm,
+              statusDisplay: statusDisplay,
+              etaSnippet: etaSnippet,
             ),
           ),
 
@@ -808,12 +947,12 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   Widget _buildPartnerInfoCard({
     required String partnerName,
-    required String partnerPhone,
+    required String? partnerPhone,
     required String partnerVehicle,
     required String partnerPhoto,
     required double rating,
-    required int etaMins,
-    required double distanceKm,
+    required String statusDisplay,
+    required String etaSnippet,
   }) {
     final photoFullUrl = ApiEndpoints.resolveImageUrl(partnerPhoto);
 
@@ -838,29 +977,41 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           Row(
             children: [
               GestureDetector(
-                onTap: () => _showZoomImageDialog(photoFullUrl),
+                onTap: () => photoFullUrl.isNotEmpty ? _showZoomImageDialog(photoFullUrl) : null,
                 child: Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFE2E8F0),
+                    color: const Color(0xFF00A859),
                     border: Border.all(color: const Color(0xFF00A859), width: 1.5),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: Image.network(
-                    photoFullUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Image.asset(
-                      'assets/images/partner_kumar.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.person_rounded,
-                        color: Color(0xFF00A859),
-                        size: 26,
-                      ),
-                    ),
-                  ),
+                  child: photoFullUrl.isNotEmpty
+                      ? Image.network(
+                          photoFullUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(
+                              partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'P',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'P',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -872,7 +1023,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                       children: [
                         Flexible(
                           child: Text(
-                            partnerName.isNotEmpty ? partnerName : 'Kumar R',
+                            partnerName,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
@@ -903,9 +1054,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                       ],
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Delivery Partner',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    Text(
+                      partnerVehicle,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -917,33 +1070,41 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 8),
 
-          // 1. Status: On the way
+          // 1. Status
           Row(
-            children: const [
-              Icon(Icons.two_wheeler_rounded, size: 15, color: Color(0xFF00A859)),
-              SizedBox(width: 8),
-              Text(
-                'On the way',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            children: [
+              const Icon(Icons.two_wheeler_rounded, size: 15, color: Color(0xFF00A859)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusDisplay,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
 
-          // 2. ETA & Distance
+          // 2. Dynamic Road ETA & Distance
           Row(
             children: [
               const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF00A859)),
-              SizedBox(width: 8),
-              Text(
-                'ETA: $etaMins min (${distanceKm.toStringAsFixed(1)} km)',
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  etaSnippet,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
 
-          // 3. Call Partner Button
+          // 3. Call Partner Button (Active phone dialer launch)
           InkWell(
             onTap: () => _callPartner(partnerPhone),
             borderRadius: BorderRadius.circular(6),
@@ -963,9 +1124,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           ),
           const SizedBox(height: 4),
 
-          // 4. Chat Button
+          // 4. In-App Chat Button (Direct in-app messaging modal)
           InkWell(
-            onTap: () => _openWhatsAppChat(partnerPhone),
+            onTap: () => _openChatSheet(context, partnerName, partnerPhone),
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
@@ -974,8 +1135,28 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                   Icon(Icons.chat_bubble_outline_rounded, size: 15, color: Color(0xFF00A859)),
                   SizedBox(width: 8),
                   Text(
-                    'Chat',
+                    'In-App Chat',
                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF00A859)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          // 5. WhatsApp Direct Option
+          InkWell(
+            onTap: () => _openWhatsAppChat(partnerPhone),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: const [
+                  Icon(Icons.chat_outlined, size: 15, color: Color(0xFF10B981)),
+                  SizedBox(width: 8),
+                  Text(
+                    'WhatsApp',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
                   ),
                 ],
               ),
@@ -1092,9 +1273,16 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Image.asset(
-                  'assets/images/partner_kumar.png',
-                  fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.person_rounded, size: 64, color: Color(0xFF00A859)),
+                  ),
                 ),
               ),
             ),

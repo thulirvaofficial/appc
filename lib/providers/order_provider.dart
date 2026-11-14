@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/api_endpoints.dart';
+import '../core/utils/safe_parse_util.dart';
 import '../data/models/order_model.dart';
 import '../data/models/subscription_model.dart';
 import 'api_provider.dart';
@@ -227,6 +228,44 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   void setFilter(String filter) {
     state = state.copyWith(selectedFilter: filter);
+  }
+
+  Future<OrderModel?> fetchOrderTrackingDetails(String orderId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('${ApiEndpoints.orders}/$orderId/tracking');
+      if (res.data != null && res.data['success'] == true) {
+        final data = res.data as Map<String, dynamic>;
+        final partner = data['partner'] as Map<String, dynamic>?;
+        final partnerLoc = data['partner_live_location'] as Map<String, dynamic>?;
+        final dest = data['customer_destination'] as Map<String, dynamic>?;
+
+        OrderModel? existing;
+        for (final o in state.orders) {
+          if (o.id.toString() == orderId || o.orderNumber == orderId) {
+            existing = o;
+            break;
+          }
+        }
+
+        if (existing != null) {
+          final updated = existing.copyWith(
+            orderStatus: data['order_status']?.toString() ?? existing.orderStatus,
+            partnerName: partner?['name']?.toString() ?? existing.partnerName,
+            partnerPhone: partner?['phone']?.toString() ?? existing.partnerPhone,
+            partnerPhoto: partner?['photo_url']?.toString() ?? existing.partnerPhoto,
+            partnerVehicle: partner?['vehicle_type']?.toString() ?? existing.partnerVehicle,
+            partnerRating: partner?['rating'] != null ? SafeParseUtil.toDouble(partner!['rating']) : existing.partnerRating,
+            partnerLatitude: partnerLoc?['latitude'] != null ? SafeParseUtil.toDouble(partnerLoc!['latitude']) : existing.partnerLatitude,
+            partnerLongitude: partnerLoc?['longitude'] != null ? SafeParseUtil.toDouble(partnerLoc!['longitude']) : existing.partnerLongitude,
+            latitude: dest?['latitude'] != null ? SafeParseUtil.toDouble(dest!['latitude']) : existing.latitude,
+            longitude: dest?['longitude'] != null ? SafeParseUtil.toDouble(dest!['longitude']) : existing.longitude,
+          );
+          return updated;
+        }
+      }
+    } catch (_) {}
+    return fetchOrderDetails(orderId);
   }
 
   Future<OrderModel?> fetchOrderDetails(String orderId) async {

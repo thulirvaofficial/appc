@@ -1094,7 +1094,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildLiveTrackingBanner(BuildContext context, OrderModel order) {
     final partnerName = (order.partnerName != null && order.partnerName!.trim().isNotEmpty)
         ? order.partnerName!
-        : 'Kumar R';
+        : 'Assigned Partner';
     final destination = (order.city.isNotEmpty ? order.city : (order.address.isNotEmpty ? order.address.split(',').first : 'Thiruverkadu')).trim();
 
     // Centralized dynamic ETA calculation from GPS coordinates
