@@ -16,13 +16,45 @@ class ApiEndpoints {
     return defaultLiveUrl;
   }
 
+  static String get serverRoot => baseUrl.replaceAll('/api', '');
+
   // Resolve static asset images from backend server
   static String resolveImageUrl(String path) {
     if (path.isEmpty) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    final serverRoot = baseUrl.replaceAll('/api', '');
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return '$serverRoot$cleanPath';
+  }
+
+  // Returns ordered list of candidate URLs for multi-host image loading
+  static List<String> getCandidateImageUrls(String path) {
+    if (path.isEmpty) return [];
+
+    String cleanPath = path;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      final uri = Uri.tryParse(path);
+      if (uri != null) {
+        cleanPath = uri.path;
+      }
+    }
+    if (!cleanPath.startsWith('/')) cleanPath = '/$cleanPath';
+
+    final candidates = <String>[];
+    final hostList = [
+      serverRoot,
+      'http://127.0.0.1:5500',
+      'http://10.0.2.2:5500',
+      'http://15.235.251.225',
+      'https://thulirva.com',
+    ];
+
+    for (final host in hostList) {
+      final url = '$host$cleanPath';
+      if (!candidates.contains(url)) {
+        candidates.add(url);
+      }
+    }
+    return candidates;
   }
 
   // Auth

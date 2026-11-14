@@ -10,6 +10,7 @@ import '../../core/utils/id_formatter.dart';
 import '../../data/models/order_model.dart';
 import '../../providers/order_provider.dart';
 import 'customer_live_tracking_screen.dart';
+import '../widgets/thulirva_delivery_proof_widget.dart';
 
 class OrderDetailsScreen extends ConsumerStatefulWidget {
   final OrderModel order;
@@ -914,7 +915,6 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
   Widget _buildCustomerDeliveryProofCard(OrderModel order) {
     final hasProof = (order.deliveryProofUrl ?? '').isNotEmpty;
-    final fullUrl = hasProof ? ApiEndpoints.resolveImageUrl(order.deliveryProofUrl!) : '';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -961,134 +961,11 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
           ),
           const Divider(height: 20),
           if (hasProof) ...[
-            GestureDetector(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => Dialog(
-                    backgroundColor: Colors.transparent,
-                    insetPadding: const EdgeInsets.all(12),
-                    child: Stack(
-                      alignment: Alignment.topRight,
-                      children: [
-                        InteractiveViewer(
-                          minScale: 0.5,
-                          maxScale: 5.0,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.network(
-                              fullUrl,
-                              fit: BoxFit.contain,
-                              loadingBuilder: (ctx, child, progress) {
-                                if (progress == null) return child;
-                                return const Center(child: CircularProgressIndicator(color: Colors.white));
-                              },
-                              errorBuilder: (ctx, err, stack) => Container(
-                                height: 200,
-                                color: Colors.black54,
-                                alignment: Alignment.center,
-                                child: const Text('Failed to load image preview', style: TextStyle(color: Colors.white70)),
-                              ),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  children: [
-                    Image.network(
-                      fullUrl,
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (ctx, child, progress) {
-                        if (progress == null) return child;
-                        return Container(
-                          height: 160,
-                          color: const Color(0xFFFAF7F0),
-                          alignment: Alignment.center,
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF15803D)),
-                              ),
-                              SizedBox(height: 6),
-                              Text('Loading doorstep proof...', style: TextStyle(fontSize: 11, color: AppColors.textMid)),
-                            ],
-                          ),
-                        );
-                      },
-                      errorBuilder: (ctx, err, stack) => Container(
-                        height: 140,
-                        color: const Color(0xFFFAF7F0),
-                        padding: const EdgeInsets.all(12),
-                        alignment: Alignment.center,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.broken_image_rounded, size: 28, color: Color(0xFFD97706)),
-                            const SizedBox(height: 6),
-                            const Text('Proof photo verified on Thulirva network', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMid)),
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: () {
-                                PaintingBinding.instance.imageCache.evict(NetworkImage(fullUrl));
-                                setState(() {});
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF15803D),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.refresh_rounded, size: 14, color: Colors.white),
-                                    SizedBox(width: 4),
-                                    Text('Retry', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.zoom_in, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text('View Photo Proof', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            ThulirvaDeliveryProofWidget(
+              proofSource: order.deliveryProofUrl,
+              height: 170,
+              enableZoom: true,
+              title: 'Doorstep Delivery Proof — ${order.formattedOrderId}',
             ),
             const SizedBox(height: 10),
           ],
