@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/notification_permission_service.dart';
+import '../../core/utils/delivery_tracking_util.dart';
 import '../../core/utils/id_formatter.dart';
 import '../../data/models/order_model.dart';
 import '../../data/models/subscription_model.dart';
@@ -1095,6 +1097,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : 'Kumar R';
     final destination = (order.city.isNotEmpty ? order.city : (order.address.isNotEmpty ? order.address.split(',').first : 'Thiruverkadu')).trim();
 
+    // Centralized dynamic ETA calculation from GPS coordinates
+    final etaText = DeliveryTrackingUtil.formatEta(
+      order.partnerLatitude,
+      order.partnerLongitude,
+      order.latitude,
+      order.longitude,
+    );
+
+    final rawPhoto = order.partnerPhoto;
+    final photoUrl = (rawPhoto != null && rawPhoto.trim().isNotEmpty)
+        ? ApiEndpoints.resolveImageUrl(rawPhoto)
+        : null;
+
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -1106,7 +1121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF1B4D3E), Color(0xFF0F362A)],
@@ -1124,23 +1139,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         child: Row(
           children: [
+            // Partner Avatar or Scooty Icon
             Container(
-              width: 46,
-              height: 46,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: const Color(0xFF00A859).withValues(alpha: 0.25),
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF00A859), width: 1.5),
               ),
-              child: const Icon(Icons.two_wheeler_rounded, color: Color(0xFF00E676), size: 24),
+              clipBehavior: Clip.antiAlias,
+              child: photoUrl != null
+                  ? Image.network(
+                      photoUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.two_wheeler_rounded,
+                        color: Color(0xFF00E676),
+                        size: 24,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.two_wheeler_rounded,
+                      color: Color(0xFF00E676),
+                      size: 24,
+                    ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
+            // Middle Content: Fully Flexible to eliminate any horizontal overflow
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         width: 7,
@@ -1150,14 +1183,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'LIVE DELIVERY IN PROGRESS',
-                        style: TextStyle(
-                          color: Color(0xFF86EFAC),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                      const SizedBox(width: 5),
+                      const Flexible(
+                        child: Text(
+                          'LIVE DELIVERY IN PROGRESS',
+                          style: TextStyle(
+                            color: Color(0xFF86EFAC),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.4,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -1167,7 +1204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     'Partner: $partnerName • On the way',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                     ),
                     maxLines: 1,
@@ -1175,44 +1212,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Delivering to $destination • ETA: 12 min',
+                    'Delivering to $destination • $etaText',
                     style: const TextStyle(
                       color: Color(0xFFCBD5E1),
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w500,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00A859),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF00A859).withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text(
-                    'Track 3D',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
+            // Track 3D Action Pill with FittedBox
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00A859),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00A859).withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                  ),
-                  SizedBox(width: 3),
-                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
-                ],
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text(
+                      'Track 3D',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 13),
+                  ],
+                ),
               ),
             ),
           ],

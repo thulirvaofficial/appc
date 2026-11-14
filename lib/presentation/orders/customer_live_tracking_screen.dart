@@ -346,25 +346,26 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               ),
             ),
 
-          // 2. Floating Top-Left Header: Back Button + Thulirva Leaf & Title + Subtitle
+          // 2. Floating Top Header & Action Buttons (Unified responsive single Row)
           Positioned(
             top: MediaQuery.of(context).padding.top + (isLandscape ? 6 : 10),
             left: 16,
-            child: _buildTopFloatingHeader(),
-          ),
-
-          // 3. Floating Top-Right Action Buttons: Search, Recenter/Settings, Layers Toggle
-          Positioned(
-            top: MediaQuery.of(context).padding.top + (isLandscape ? 6 : 10),
             right: 16,
-            child: _buildTopRightActions(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(child: _buildTopFloatingHeader()),
+                const SizedBox(width: 8),
+                _buildTopRightActions(),
+              ],
+            ),
           ),
 
-          // 4. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
+          // 3. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
           Positioned(
-            top: MediaQuery.of(context).padding.top + (isLandscape ? 58 : 72),
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 58 : 68),
             left: 16,
-            width: isLandscape ? 250 : 260,
+            width: isLandscape ? 250 : 255,
             child: _buildPartnerInfoCard(
               partnerName: partnerName,
               partnerPhone: partnerPhone,
@@ -376,7 +377,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ),
           ),
 
-          // 5. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
+          // 4. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
           Positioned(
             bottom: isLandscape ? 16 : 24,
             left: isLandscape ? 278 : 16,
@@ -390,7 +391,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   Widget _buildTopFloatingHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
@@ -407,39 +408,43 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         children: [
           InkWell(
             onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A), size: 20),
+            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A), size: 19),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Image.asset(
             'assets/images/logo/thulirva_brand_logo.png',
-            width: 22,
-            height: 22,
-            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, color: Color(0xFF00A859), size: 22),
+            width: 20,
+            height: 20,
+            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, color: Color(0xFF00A859), size: 20),
           ),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text(
-                'Thulirva',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF00A859),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'Thulirva',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF00A859),
+                  ),
                 ),
-              ),
-              Text(
-                'Live Delivery Tracking',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w600,
+                Text(
+                  'Live Delivery Tracking',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
         ],
       ),
     );
@@ -451,27 +456,29 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildCircularTopBtn(
-          icon: Icons.search_rounded,
-          tooltip: 'Search',
-          onTap: () {},
-        ),
-        const SizedBox(width: 8),
+        if (isLandscape) ...[
+          _buildCircularTopBtn(
+            icon: Icons.search_rounded,
+            tooltip: 'Search',
+            onTap: () {},
+          ),
+          const SizedBox(width: 6),
+        ],
         _buildCircularTopBtn(
           icon: isLandscape ? Icons.stay_current_portrait_rounded : Icons.screen_rotation_rounded,
           tooltip: isLandscape ? 'Switch to Portrait' : 'Rotate to Fullscreen Landscape (Reference View)',
           onTap: _toggleOrientation,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         _buildCircularTopBtn(
           icon: Icons.settings_outlined,
           tooltip: 'Recenter on Rider',
           onTap: _recenterOnRider,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         _buildCircularTopBtn(
           icon: Icons.layers_outlined,
-          tooltip: 'Toggle 3D Isometric View / Map View',
+          tooltip: 'Toggle 3D Isometric View / Real Google Map View',
           onTap: () {
             setState(() {
               _showIsometricCity = !_showIsometricCity;
@@ -498,8 +505,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
@@ -514,7 +521,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           ),
           child: Icon(
             icon,
-            size: 18,
+            size: 17,
             color: isActive ? const Color(0xFF00A859) : const Color(0xFF334155),
           ),
         ),
@@ -762,12 +769,15 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           child: Icon(icon, color: iconColor, size: index == 2 ? 18 : 16),
         ),
         const SizedBox(height: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: isCompletedOrActive ? FontWeight.w800 : FontWeight.w600,
-            color: isCompletedOrActive ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: isCompletedOrActive ? FontWeight.w800 : FontWeight.w600,
+              color: isCompletedOrActive ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+            ),
           ),
         ),
       ],

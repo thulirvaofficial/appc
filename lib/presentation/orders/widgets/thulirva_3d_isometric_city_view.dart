@@ -915,7 +915,7 @@ class _IsometricCityPainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// Renders Origin Hub Pin: "Thulirva Dairy Hub"
+  /// Renders Origin Hub Pin: "Thulirva \n Dairy Hub"
   void _drawOriginHubPin(Canvas canvas, Offset pos, String label) {
     // Drop shadow
     canvas.drawOval(
@@ -951,37 +951,57 @@ class _IsometricCityPainter extends CustomPainter {
       Offset(pos.dx - iconPainter.width / 2, pos.dy - 6 - iconPainter.height / 2),
     );
 
-    // White Card Pill below: "Thulirva Dairy Hub"
+    // White Card Pill below: "Thulirva \n Dairy Hub"
     final textSpan = TextSpan(
-      text: label,
-      style: const TextStyle(
-        color: Color(0xFF173F2D),
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-      ),
+      children: [
+        const TextSpan(
+          text: 'Thulirva\n',
+          style: TextStyle(
+            color: Color(0xFF173F2D),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const TextSpan(
+          text: 'Dairy Hub',
+          style: TextStyle(
+            color: Color(0xFF173F2D),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
     final textPainter = TextPainter(
       text: textSpan,
+      textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
 
-    final pillWidth = textPainter.width + 22;
-    const pillHeight = 28.0;
+    final pillWidth = textPainter.width + 24;
+    const pillHeight = 36.0;
+    final cardCenter = Offset(pos.dx, pos.dy + 32);
     final pillRect = Rect.fromCenter(
-      center: Offset(pos.dx, pos.dy + 26),
+      center: cardCenter,
       width: pillWidth,
       height: pillHeight,
     );
 
-    // Pill background
+    // Card drop shadow
     canvas.drawRRect(
-      RRect.fromRectAndRadius(pillRect, const Radius.circular(14)),
+      RRect.fromRectAndRadius(pillRect.shift(const Offset(0, 3)), const Radius.circular(10)),
+      Paint()..color = Colors.black.withValues(alpha: 0.10),
+    );
+
+    // Card background
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(pillRect, const Radius.circular(10)),
       Paint()..color = Colors.white,
     );
-    // Pill shadow border
+    // Card border
     canvas.drawRRect(
-      RRect.fromRectAndRadius(pillRect, const Radius.circular(14)),
+      RRect.fromRectAndRadius(pillRect, const Radius.circular(10)),
       Paint()
         ..color = const Color(0xFFE2E8F0)
         ..strokeWidth = 1
@@ -990,11 +1010,11 @@ class _IsometricCityPainter extends CustomPainter {
 
     textPainter.paint(
       canvas,
-      Offset(pos.dx - textPainter.width / 2, pos.dy + 26 - textPainter.height / 2),
+      Offset(cardCenter.dx - textPainter.width / 2, cardCenter.dy - textPainter.height / 2),
     );
   }
 
-  /// Renders Destination Pin: "Customer <Area>" matching reference image (pin with card on right)
+  /// Renders Destination Pin: "Customer \n <Area>" matching reference image
   void _drawDestinationCustomerPin(Canvas canvas, Offset pos, String area) {
     // Drop shadow under pin
     canvas.drawOval(
@@ -1030,15 +1050,15 @@ class _IsometricCityPainter extends CustomPainter {
       Offset(pos.dx - iconPainter.width / 2, pos.dy - 6 - iconPainter.height / 2),
     );
 
-    // White Card Pill to the RIGHT of the red badge (matching reference image)
+    // White Card Pill below red badge: "Customer \n <Area>"
     final textSpan = TextSpan(
       children: [
         const TextSpan(
           text: 'Customer\n',
           style: TextStyle(
             color: Color(0xFF64748B),
-            fontSize: 10.5,
-            fontWeight: FontWeight.w600,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
           ),
         ),
         TextSpan(
@@ -1046,22 +1066,21 @@ class _IsometricCityPainter extends CustomPainter {
           style: const TextStyle(
             color: Color(0xFF0F172A),
             fontSize: 12.5,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ],
     );
     final textPainter = TextPainter(
       text: textSpan,
-      textAlign: TextAlign.left,
+      textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
 
     final pillWidth = textPainter.width + 24;
     const pillHeight = 36.0;
-    // Position card directly to the right of the badge
-    final cardCenter = Offset(pos.dx + 22 + pillWidth / 2, pos.dy - 6);
+    final cardCenter = Offset(pos.dx, pos.dy + 32);
     final pillRect = Rect.fromCenter(
       center: cardCenter,
       width: pillWidth,
@@ -1071,7 +1090,7 @@ class _IsometricCityPainter extends CustomPainter {
     // Card drop shadow
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect.shift(const Offset(0, 3)), const Radius.circular(10)),
-      Paint()..color = Colors.black.withValues(alpha: 0.08),
+      Paint()..color = Colors.black.withValues(alpha: 0.10),
     );
 
     // Card background
