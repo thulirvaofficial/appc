@@ -1,3 +1,5 @@
+import '../../core/utils/safe_parse_util.dart';
+
 class SubscriptionPlanModel {
   final dynamic id;
   final dynamic productId;
@@ -40,10 +42,10 @@ class SubscriptionPlanModel {
       productImage: json['product_image'],
       timePeriod: json['time_period'] ?? 'Daily Morning (30 Days)',
       frequency: json['frequency'] ?? 'Daily',
-      durationDays: int.tryParse((json['duration_days'] ?? 30).toString()) ?? 30,
-      price: double.tryParse((json['price'] ?? 0).toString()) ?? 0.0,
-      originalPrice: json['original_price'] != null ? double.tryParse(json['original_price'].toString()) : null,
-      discountPercent: int.tryParse((json['discount_percent'] ?? 0).toString()) ?? 0,
+      durationDays: SafeParseUtil.toInt(json['duration_days'], 30),
+      price: SafeParseUtil.toDouble(json['price']),
+      originalPrice: json['original_price'] != null ? SafeParseUtil.toDouble(json['original_price']) : null,
+      discountPercent: SafeParseUtil.toInt(json['discount_percent']),
       description: json['description'] ?? '',
       badge: json['badge'] ?? 'Popular',
       status: json['status'] ?? 'active',
@@ -207,10 +209,10 @@ class SubscriptionModel {
       productImage: json['product_image'] ?? json['productImage'],
       timePeriod: json['time_period'] ?? json['timePeriod'] ?? 'Daily (30 Days)',
       frequency: json['frequency'] ?? 'Daily',
-      quantity: int.tryParse((json['quantity'] ?? 1).toString()) ?? 1,
+      quantity: SafeParseUtil.toInt(json['quantity'], 1),
       deliverySlot: json['delivery_slot'] ?? json['deliverySlot'] ?? '6:00 AM - 7:00 AM',
-      pricePerDelivery: double.tryParse((json['price_per_delivery'] ?? 44).toString()) ?? 44.0,
-      totalPrice: double.tryParse((json['total_price'] ?? json['totalPrice'] ?? 0).toString()) ?? 0.0,
+      pricePerDelivery: SafeParseUtil.toDouble(json['price_per_delivery'], 44.0),
+      totalPrice: SafeParseUtil.toDouble(json['total_price'] ?? json['totalPrice']),
       startDate: startStr,
       expiryDate: expiryFormatted,
       nextRenewalDate: json['next_renewal_date'] ?? json['nextRenewalDate'] ?? expiryFormatted,

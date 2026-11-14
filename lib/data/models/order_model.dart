@@ -1,5 +1,7 @@
 import '../../core/utils/id_formatter.dart';
 
+import '../../core/utils/safe_parse_util.dart';
+
 class OrderModel {
   final dynamic id;
   final dynamic userId;
@@ -105,11 +107,11 @@ class OrderModel {
       state: json['state'] ?? 'Tamil Nadu',
       pincode: json['pincode'] ?? '',
       items: json['items'] as List<dynamic>? ?? [],
-      subtotal: double.tryParse((json['subtotal'] ?? 0).toString()) ?? 0.0,
-      deliveryCharge: double.tryParse((json['delivery_charge'] ?? 30).toString()) ?? 30.0,
-      discountAmount: double.tryParse((json['discount_amount'] ?? 0).toString()) ?? 0.0,
+      subtotal: SafeParseUtil.toDouble(json['subtotal']),
+      deliveryCharge: SafeParseUtil.toDouble(json['delivery_charge'], 30.0),
+      discountAmount: SafeParseUtil.toDouble(json['discount_amount']),
       promoCode: json['promo_code'] ?? json['coupon_code'],
-      total: double.tryParse((json['total'] ?? json['total_price'] ?? json['total_amount'] ?? 0).toString()) ?? 0.0,
+      total: SafeParseUtil.toDouble(json['total'] ?? json['total_price'] ?? json['total_amount']),
       paymentMethod: json['payment_method'] ?? 'UPI Direct',
       paymentStatus: json['payment_status'] ?? 'pending',
       orderStatus: json['order_status'] ?? json['status'] ?? 'pending',
@@ -126,13 +128,13 @@ class OrderModel {
       partnerPhone: json['partner_phone']?.toString(),
       partnerPhoto: json['partner_photo']?.toString(),
       partnerVehicle: json['partner_vehicle']?.toString(),
-      partnerRating: double.tryParse((json['partner_rating'] ?? 5.0).toString()),
-      partnerLatitude: json['partner_latitude'] != null ? double.tryParse(json['partner_latitude'].toString()) : null,
-      partnerLongitude: json['partner_longitude'] != null ? double.tryParse(json['partner_longitude'].toString()) : null,
-      rating: double.tryParse((json['rating'] ?? 0).toString()),
+      partnerRating: json['partner_rating'] != null ? SafeParseUtil.toDouble(json['partner_rating'], 5.0) : null,
+      partnerLatitude: json['partner_latitude'] != null ? SafeParseUtil.toDouble(json['partner_latitude']) : null,
+      partnerLongitude: json['partner_longitude'] != null ? SafeParseUtil.toDouble(json['partner_longitude']) : null,
+      rating: json['rating'] != null ? SafeParseUtil.toDouble(json['rating']) : null,
       feedback: json['feedback']?.toString(),
-      latitude: double.tryParse((json['latitude'] ?? '').toString()),
-      longitude: double.tryParse((json['longitude'] ?? '').toString()),
+      latitude: json['latitude'] != null ? SafeParseUtil.toDouble(json['latitude']) : null,
+      longitude: json['longitude'] != null ? SafeParseUtil.toDouble(json['longitude']) : null,
       deliveryProofUrl: json['delivery_proof_url'] ?? json['delivery_proof'] ?? json['proof_url'],
       deliveredAt: json['delivered_at'] ?? json['delivery_proof_timestamp'],
     );

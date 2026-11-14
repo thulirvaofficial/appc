@@ -522,13 +522,16 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
     }
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => OrderDetailsScreen(order: order),
           ),
         );
+        if (mounted) {
+          ref.read(orderProvider.notifier).fetchOrders();
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

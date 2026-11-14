@@ -1,5 +1,7 @@
 import '../../core/constants/api_endpoints.dart';
 
+import '../../core/utils/safe_parse_util.dart';
+
 class ProductVariantModel {
   final dynamic id;
   final dynamic productId;
@@ -32,9 +34,9 @@ class ProductVariantModel {
       name: json['name']?.toString() ?? 'Standard',
       weightValue: json['weight_value']?.toString() ?? '',
       unit: json['unit']?.toString() ?? 'g',
-      price: double.tryParse((json['price'] ?? 0).toString()) ?? 0.0,
-      comparePrice: json['compare_price'] != null ? double.tryParse(json['compare_price'].toString()) : null,
-      stock: int.tryParse((json['stock'] ?? 50).toString()) ?? 50,
+      price: SafeParseUtil.toDouble(json['price']),
+      comparePrice: json['compare_price'] != null ? SafeParseUtil.toDouble(json['compare_price']) : null,
+      stock: SafeParseUtil.toInt(json['stock'], 50),
       isDefault: json['is_default'] == true,
       isActive: json['is_active'] != false,
     );
@@ -100,7 +102,7 @@ class ProductModel {
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     final parsedId = json['id'] ?? json['product_id'] ?? 0;
     final parsedName = (json['name'] ?? json['title'] ?? json['product_name'] ?? 'Fresh Farm Product').toString();
-    final parsedPrice = double.tryParse((json['price'] ?? 0).toString()) ?? 0.0;
+    final parsedPrice = SafeParseUtil.toDouble(json['price']);
     final parsedWeight = (json['weight'] ?? '').toString();
 
     // Parse variants if provided by backend API
@@ -123,9 +125,9 @@ class ProductModel {
       category: (json['category'] ?? json['category_name'] ?? 'Dairy').toString(),
       categoryName: json['category_name']?.toString() ?? json['category']?.toString(),
       price: parsedPrice,
-      comparePrice: json['compare_price'] != null ? double.tryParse(json['compare_price'].toString()) : null,
+      comparePrice: json['compare_price'] != null ? SafeParseUtil.toDouble(json['compare_price']) : null,
       weight: parsedWeight,
-      stock: int.tryParse((json['stock'] ?? 50).toString()) ?? 50,
+      stock: SafeParseUtil.toInt(json['stock'], 50),
       badge: json['badge']?.toString(),
       emoji: json['emoji']?.toString() ?? '🥛',
       image: json['image']?.toString() ?? json['image_url']?.toString(),
