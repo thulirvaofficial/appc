@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:socket_io_client/socket_io_client.dart' as socket_io;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/services/routing_service.dart';
@@ -28,6 +31,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   GoogleMapController? _mapController;
   late OrderModel _order;
   Timer? _telemetryTimer;
+  socket_io.Socket? _socket;
 
   // Camera & Perspective Settings (3D Isometric Master View)
   double _currentHeading = 45.0;
@@ -56,6 +60,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     _order = widget.initialOrder;
     _loadCustomMarkers();
     _loadRealRoadRoute();
+    _initSocket();
     _startLiveTelemetrySync();
 
     // Allow both portrait and landscape viewing for 3D live delivery tracking
@@ -70,6 +75,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   @override
   void dispose() {
     _telemetryTimer?.cancel();
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
     _mapController?.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -78,6 +86,120 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       DeviceOrientation.landscapeRight,
     ]);
     super.dispose();
+  }
+
+  void _initSocket() {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+      return;
+    }
+
+    try {
+      final origin = ApiEndpoints.serverRoot;
+      debugPrint('[CustomerTracking] Connecting to socket server: $origin');
+
+      _socket = socket_io.io(
+        origin,
+        socket_io.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .enableAutoConnect()
+            .enableReconnection()
+            .setReconnectionAttempts(10)
+            .setReconnectionDelay(2000)
+            .build(),
+      );
+
+      _socket!.onConnect((_) {
+        debugPrint('[CustomerTracking] Connected to socket server');
+        _joinTrackingRooms();
+      });
+
+      _socket!.onReconnect((_) {
+        debugPrint('[CustomerTracking] Reconnected to socket server');
+        _joinTrackingRooms();
+      });
+
+      void handleLocationEvent(dynamic data) {
+        if (!mounted || data is! Map) return;
+        final lat = double.tryParse(data['latitude']?.toString() ?? '');
+        final lng = double.tryParse(data['longitude']?.toString() ?? '');
+        final heading = double.tryParse(data['heading']?.toString() ?? '') ?? _currentHeading;
+
+        if (lat != null && lng != null) {
+          final oldLat = _order.partnerLatitude;
+          final oldLng = _order.partnerLongitude;
+
+          if (oldLat != null && oldLng != null) {
+            final dLat = lat - oldLat;
+            final dLng = lng - oldLng;
+            if (dLat.abs() > 0.00005 || dLng.abs() > 0.00005) {
+              final radians = math.atan2(dLng, dLat);
+              _currentHeading = (radians * 180 / math.pi + 360) % 360;
+            } else if (heading != 0) {
+              _currentHeading = heading;
+            }
+          } else if (heading != 0) {
+            _currentHeading = heading;
+          }
+
+          setState(() {
+            _order = _order.copyWith(
+              partnerLatitude: lat,
+              partnerLongitude: lng,
+            );
+          });
+
+          _loadCustomMarkers();
+
+          if (_is3dView && _mapController != null) {
+            _mapController!.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(
+                  target: LatLng(lat, lng),
+                  zoom: 17.5,
+                  tilt: _currentTilt,
+                  bearing: _currentHeading,
+                ),
+              ),
+            );
+          }
+        }
+      }
+
+      _socket!.on('delivery:location_updated', handleLocationEvent);
+      _socket!.on('delivery:location:update', handleLocationEvent);
+      _socket!.on('partner:location:updated', handleLocationEvent);
+
+      void handleStatusEvent(dynamic data) {
+        if (!mounted || data is! Map) return;
+        final newStatus = data['status']?.toString() ?? data['order_status']?.toString();
+        if (newStatus != null && newStatus.isNotEmpty) {
+          setState(() {
+            _order = _order.copyWith(orderStatus: newStatus);
+          });
+          if (newStatus.toLowerCase() == 'delivered') {
+            _telemetryTimer?.cancel();
+          }
+        }
+      }
+
+      _socket!.on('order:status_updated', handleStatusEvent);
+      _socket!.on('order:status', handleStatusEvent);
+      _socket!.on('delivery:in_transit', (_) => handleStatusEvent({'status': 'out_for_delivery'}));
+      _socket!.on('delivery:delivered', (_) => handleStatusEvent({'status': 'delivered'}));
+    } catch (e) {
+      debugPrint('[CustomerTracking] Socket init error: $e');
+    }
+  }
+
+  void _joinTrackingRooms() {
+    if (_socket != null && _socket!.connected) {
+      final orderId = _order.id.toString();
+      _socket!.emit('join:order', {'orderId': orderId});
+      if (_order.userId != null) {
+        _socket!.emit('join:customer', {'userId': _order.userId.toString()});
+      }
+      debugPrint('[CustomerTracking] Joined room order_$orderId');
+    }
   }
 
   void _toggleOrientation() {
