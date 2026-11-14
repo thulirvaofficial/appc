@@ -23,6 +23,9 @@ class ApiEndpoints {
     if (path.isEmpty) return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     final cleanPath = path.startsWith('/') ? path : '/$path';
+    if (cleanPath.startsWith('/uploads/')) {
+      return '$baseUrl$cleanPath';
+    }
     return '$serverRoot$cleanPath';
   }
 
@@ -40,6 +43,15 @@ class ApiEndpoints {
     if (!cleanPath.startsWith('/')) cleanPath = '/$cleanPath';
 
     final candidates = <String>[];
+
+    // Priority 1: If path is in /uploads/, request via /api/uploads/ which Nginx proxies directly to Express
+    if (cleanPath.startsWith('/uploads/')) {
+      final apiCandidate = '$baseUrl$cleanPath';
+      if (!candidates.contains(apiCandidate)) {
+        candidates.add(apiCandidate);
+      }
+    }
+
     final hostList = [
       serverRoot,
       'http://127.0.0.1:5500',
@@ -49,7 +61,14 @@ class ApiEndpoints {
     ];
 
     for (final host in hostList) {
-      final url = '$host$cleanPath';
+      final cleanHost = host.replaceAll(RegExp(r'/api/?$'), '');
+      if (cleanPath.startsWith('/uploads/')) {
+        final apiVariant = '$cleanHost/api$cleanPath';
+        if (!candidates.contains(apiVariant)) {
+          candidates.add(apiVariant);
+        }
+      }
+      final url = '$cleanHost$cleanPath';
       if (!candidates.contains(url)) {
         candidates.add(url);
       }

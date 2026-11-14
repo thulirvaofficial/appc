@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 /// Renders an authentic isometric 3D city scene matching the reference specification:
 /// - Mathematically exact 30-degree isometric projection grid
 /// - Broad diagonal avenue running from bottom-left towards top-right
-/// - Realistic isometric 3D buildings with multi-tier window bands, parapets, and rooftop HVAC units
-/// - Clean isometric avenues with sidewalks, curbs, and pedestrian crosswalks
-/// - Realistic low-poly 3D trees with multi-toned canopies and circular drop shadows
+/// - Realistic modern architectural 3D buildings with elegant facades, recessed window bays, and rooftop HVAC units
+/// - Clean isometric avenues with sidewalks, curbs, landscaped grass parks, and pedestrian crosswalks
+/// - Realistic low-poly 3D trees with multi-toned emerald canopies and circular drop shadows
 /// - Vibrant green Thulirva delivery route with glowing mint halo and white dashed centerline
 /// - Origin "Thulirva Dairy Hub" pin and destination "Customer <Area>" pin
 /// - Realistic 3D electric scooty with delivery rider wearing green uniform/helmet
@@ -68,12 +68,10 @@ class _Thulirva3DIsometricCityViewState extends State<Thulirva3DIsometricCityVie
     final double offsetY;
 
     if (isLandscape) {
-      // In landscape, fit the action corridor comfortably into the screen
       targetScale = (viewportSize.width / 1350.0).clamp(0.60, 1.20);
       offsetY = 10.0;
     } else {
-      // In portrait, fit between top & bottom cards
-      targetScale = (viewportSize.width / 820.0).clamp(0.42, 0.85);
+      targetScale = (viewportSize.width / 820.0).clamp(0.45, 0.90);
       offsetY = viewportSize.height * 0.05;
     }
 
@@ -148,25 +146,22 @@ class _IsometricCityPainter extends CustomPainter {
   });
 
   // Mathematically exact 30-degree Isometric unit vectors
-  // vAvenue (axis 1): Points North-East / Up-Right along the main boulevard
-  // cos(30°) = 0.866025, -sin(30°) = -0.5
   static const double cos30 = 0.86602540378;
   static const double sin30 = 0.5;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw Clean Urban Base Foundation (Light Concrete / Slate)
+    // 1. Urban Base Ground Foundation (Soft Modern Slate)
     final groundPaint = Paint()..color = const Color(0xFFF1F5F9);
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), groundPaint);
 
-    // 2. Draw Realistic Isometric Avenues, Sidewalks, and Crosswalks
+    // 2. Landscaped Green Grass Plots / City Parks
+    _drawLandscapedParks(canvas, size);
+
+    // 3. Realistic Isometric Avenues, Sidewalks, and Pedestrian Crosswalks
     _drawStreetsAndSidewalks(canvas, size);
 
-    // 3. Define the Smooth Delivery Route Path
-    // Origin Hub: Lower-Left (220, 680)
-    // Merge into Main Boulevard at (380, 600)
-    // Run straight up-right along main boulevard to (1040, 260)
-    // Turn slightly right into customer street to (1150, 310)
+    // 4. Delivery Route Path
     final hubPoint = const Offset(210, 675);
     final boulevardEntry = const Offset(360, 600);
     final customerTurn = const Offset(1040, 260);
@@ -174,20 +169,17 @@ class _IsometricCityPainter extends CustomPainter {
 
     final routePath = Path();
     routePath.moveTo(hubPoint.dx, hubPoint.dy);
-    // Smooth turn out of hub onto boulevard
     routePath.quadraticBezierTo(270, 655, boulevardEntry.dx, boulevardEntry.dy);
-    // Straight boulevard run (exact isometric avenue)
     routePath.lineTo(customerTurn.dx, customerTurn.dy);
-    // Smooth curve into customer doorstep street
     routePath.quadraticBezierTo(1090, 280, customerPoint.dx, customerPoint.dy);
 
-    // 4. Render 3D Extruded Buildings with Facade Windows & Rooftop Units
+    // 5. Render 3D Extruded Buildings (Modern Architectural Clean Geometries - No Barcode Stripes)
     _draw3DBuildings(canvas, size);
 
-    // 5. Render 3D Low-Poly Trees along sidewalks and courtyards
+    // 6. Render 3D Low-Poly Trees along sidewalks and courtyards
     _draw3DTrees(canvas, size);
 
-    // 6. Draw Glowing Green Route Line
+    // 7. Draw Glowing Green Route Line
     // Outer Mint Glow Halo
     final glowPaint = Paint()
       ..color = const Color(0xFF22C55E).withValues(alpha: 0.38)
@@ -232,81 +224,107 @@ class _IsometricCityPainter extends CustomPainter {
         final riderPos = tangent.position;
         final riderAngle = tangent.angle;
 
-        // 7. Draw 3D Rider & Scooty
+        // 8. Draw 3D Rider & Scooty
         _draw3DRiderAndScooty(canvas, riderPos, riderAngle);
       }
     }
 
-    // 8. Render Origin Pin: "Thulirva Dairy Hub"
+    // 9. Origin Pin: "Thulirva Dairy Hub"
     _drawOriginHubPin(canvas, hubPoint, hubName);
 
-    // 9. Render Destination Pin: "Customer <Area>"
+    // 10. Destination Pin: "Customer <Area>"
     _drawDestinationCustomerPin(canvas, customerPoint, customerArea);
+  }
+
+  /// Renders Landscaped Green Grass Plots and Parks
+  void _drawLandscapedParks(Canvas canvas, Size size) {
+    final parkPaint = Paint()..color = const Color(0xFFDCFCE7);
+    final parkBorder = Paint()
+      ..color = const Color(0xFFBBF7D0)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final parks = [
+      // Courtyard near Hub
+      const Offset(260, 480),
+      // Central Park north of boulevard
+      const Offset(620, 260),
+      // East Garden near destination
+      const Offset(980, 160),
+      // South-West Green Belt
+      const Offset(520, 680),
+      // South-East Plaza
+      const Offset(880, 560),
+    ];
+
+    for (final p in parks) {
+      final dx1 = 120 * cos30;
+      final dy1 = -120 * sin30;
+      final dx2 = 80 * cos30;
+      final dy2 = 80 * sin30;
+
+      final path = Path()
+        ..moveTo(p.dx, p.dy)
+        ..lineTo(p.dx + dx2, p.dy + dy2)
+        ..lineTo(p.dx + dx2 - dx1, p.dy + dy2 - dy1)
+        ..lineTo(p.dx - dx1, p.dy - dy1)
+        ..close();
+
+      canvas.drawPath(path, parkPaint);
+      canvas.drawPath(path, parkBorder);
+    }
   }
 
   /// Renders Isometric Avenues, Sidewalks, and Pedestrian Crosswalks
   void _drawStreetsAndSidewalks(Canvas canvas, Size size) {
-    // 1. Broad Sidewalk Base Bands
     final sidewalkPaint = Paint()
       ..color = const Color(0xFFE2E8F0)
       ..strokeWidth = 78
       ..style = PaintingStyle.stroke;
 
     final asphaltPaint = Paint()
-      ..color = const Color(0xFFCBD5E1).withValues(alpha: 0.75)
+      ..color = const Color(0xFFCBD5E1).withValues(alpha: 0.82)
       ..strokeWidth = 52
       ..style = PaintingStyle.stroke;
 
     final curbPaint = Paint()
-      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.50)
+      ..color = const Color(0xFF94A3B8).withValues(alpha: 0.40)
       ..strokeWidth = 1.4
       ..style = PaintingStyle.stroke;
 
-    // Avenues running along Axis 1 (North-East / Up-Right): slope = -tan(30°) = -0.57735
-    // Equation: y - y0 = -0.57735 * (x - x0)
-    // Main Delivery Boulevard: passes through (0, 780) -> (1500, 780 - 1500 * 0.57735 = -86)
-    // Intercepts: y-intercepts at regular intervals
     final avenueIntercepts = [1150.0, 850.0, 550.0, 250.0];
 
     for (final y0 in avenueIntercepts) {
       final pStart = Offset(0, y0);
       final pEnd = Offset(size.width, y0 - size.width * (sin30 / cos30));
 
-      // Draw Sidewalk base
       canvas.drawLine(pStart, pEnd, sidewalkPaint);
-      // Draw Asphalt roadway
       canvas.drawLine(pStart, pEnd, asphaltPaint);
 
-      // Draw Curbs
       final perpX = 39 * sin30;
       final perpY = 39 * cos30;
       canvas.drawLine(Offset(pStart.dx - perpX, pStart.dy - perpY), Offset(pEnd.dx - perpX, pEnd.dy - perpY), curbPaint);
       canvas.drawLine(Offset(pStart.dx + perpX, pStart.dy + perpY), Offset(pEnd.dx + perpX, pEnd.dy + perpY), curbPaint);
     }
 
-    // Cross Streets running along Axis 2 (South-East / Down-Right): slope = +tan(30°) = +0.57735
-    // Equation: y - y0 = +0.57735 * (x - x0)
     final crossStreetIntercepts = [-450.0, -150.0, 150.0, 450.0, 750.0];
 
     for (final y0 in crossStreetIntercepts) {
       final pStart = Offset(0, y0);
       final pEnd = Offset(size.width, y0 + size.width * (sin30 / cos30));
 
-      // Draw Sidewalk base
       canvas.drawLine(pStart, pEnd, sidewalkPaint);
-      // Draw Asphalt roadway
       canvas.drawLine(pStart, pEnd, asphaltPaint);
 
-      // Draw Curbs
       final perpX = 39 * sin30;
       final perpY = -39 * cos30;
       canvas.drawLine(Offset(pStart.dx - perpX, pStart.dy - perpY), Offset(pEnd.dx - perpX, pEnd.dy - perpY), curbPaint);
       canvas.drawLine(Offset(pStart.dx + perpX, pStart.dy + perpY), Offset(pEnd.dx + perpX, pEnd.dy + perpY), curbPaint);
     }
 
-    // White Pedestrian Crosswalks (Zebra Stripes at Intersections along Main Boulevard)
+    // White Pedestrian Crosswalks (Zebra Stripes at Intersections)
     final crosswalkPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.65)
+      ..color = Colors.white.withValues(alpha: 0.70)
       ..strokeWidth = 2.4
       ..style = PaintingStyle.stroke;
 
@@ -333,43 +351,41 @@ class _IsometricCityPainter extends CustomPainter {
   /// Renders 3D Extruded Isometric Buildings with Realistic Facades & Rooftops
   void _draw3DBuildings(Canvas canvas, Size size) {
     final buildings = [
-      // 1. North-West Blocks (Above Main Boulevard - Commercial & Residential Skyline)
-      // Block A (Near Hub, West)
-      _BuildingData(const Offset(220, 490), 75, 55, 70, true, true),
-      _BuildingData(const Offset(310, 440), 80, 50, 95, true, true),
-      _BuildingData(const Offset(390, 390), 65, 45, 60, true, false),
-      _BuildingData(const Offset(160, 420), 70, 48, 80, true, true),
+      // North-West Blocks (Skyline)
+      _BuildingData(const Offset(220, 490), 75, 55, 75, true, true),
+      _BuildingData(const Offset(310, 440), 80, 50, 100, true, true),
+      _BuildingData(const Offset(390, 390), 65, 45, 65, false, false),
+      _BuildingData(const Offset(160, 420), 70, 48, 85, true, true),
 
-      // Block B (Center North-West - Tall Modern Office Towers)
-      _BuildingData(const Offset(480, 340), 90, 60, 120, true, true),
-      _BuildingData(const Offset(570, 290), 95, 55, 105, true, true),
-      _BuildingData(const Offset(660, 240), 80, 50, 85, true, false),
-      _BuildingData(const Offset(540, 210), 85, 52, 95, true, true),
-      _BuildingData(const Offset(630, 160), 75, 45, 75, true, false),
+      // Center North-West Towers
+      _BuildingData(const Offset(480, 340), 90, 60, 125, true, true),
+      _BuildingData(const Offset(570, 290), 95, 55, 110, true, true),
+      _BuildingData(const Offset(660, 240), 80, 50, 90, false, false),
+      _BuildingData(const Offset(540, 210), 85, 52, 100, true, true),
+      _BuildingData(const Offset(630, 160), 75, 45, 80, false, false),
 
-      // Block C (East North-West - Destination Area)
-      _BuildingData(const Offset(750, 190), 85, 55, 90, true, true),
-      _BuildingData(const Offset(840, 140), 90, 60, 110, true, true),
-      _BuildingData(const Offset(930, 90), 75, 50, 70, true, false),
-      _BuildingData(const Offset(1020, 140), 70, 45, 65, true, false),
-      _BuildingData(const Offset(1110, 190), 80, 50, 85, true, true),
+      // East North-West (Destination Sector)
+      _BuildingData(const Offset(750, 190), 85, 55, 95, true, true),
+      _BuildingData(const Offset(840, 140), 90, 60, 115, true, true),
+      _BuildingData(const Offset(930, 90), 75, 50, 75, false, false),
+      _BuildingData(const Offset(1020, 140), 70, 45, 70, false, false),
+      _BuildingData(const Offset(1110, 190), 80, 50, 90, true, true),
 
-      // 2. South-East Blocks (Below Main Boulevard - Mid-rise & Commercial Warehouses)
-      // Block D (South-West)
-      _BuildingData(const Offset(380, 770), 85, 55, 65, true, false),
-      _BuildingData(const Offset(470, 720), 80, 50, 75, true, true),
-      _BuildingData(const Offset(560, 670), 70, 45, 55, true, false),
+      // South-East Blocks
+      _BuildingData(const Offset(380, 770), 85, 55, 70, false, false),
+      _BuildingData(const Offset(470, 720), 80, 50, 80, true, true),
+      _BuildingData(const Offset(560, 670), 70, 45, 60, false, false),
 
-      // Block E (Center South-East)
-      _BuildingData(const Offset(650, 620), 85, 55, 75, true, true),
-      _BuildingData(const Offset(740, 570), 90, 50, 85, true, true),
-      _BuildingData(const Offset(830, 520), 75, 48, 65, true, false),
+      // Center South-East
+      _BuildingData(const Offset(650, 620), 85, 55, 80, true, true),
+      _BuildingData(const Offset(740, 570), 90, 50, 90, true, true),
+      _BuildingData(const Offset(830, 520), 75, 48, 70, false, false),
 
-      // Block F (East South-East)
-      _BuildingData(const Offset(920, 470), 80, 50, 70, true, true),
-      _BuildingData(const Offset(1010, 420), 85, 52, 80, true, true),
-      _BuildingData(const Offset(1100, 370), 75, 46, 60, true, false),
-      _BuildingData(const Offset(1190, 420), 70, 44, 55, true, false),
+      // East South-East
+      _BuildingData(const Offset(920, 470), 80, 50, 75, true, true),
+      _BuildingData(const Offset(1010, 420), 85, 52, 85, true, true),
+      _BuildingData(const Offset(1100, 370), 75, 46, 65, false, false),
+      _BuildingData(const Offset(1190, 420), 70, 44, 60, false, false),
     ];
 
     for (final b in buildings) {
@@ -386,11 +402,8 @@ class _IsometricCityPainter extends CustomPainter {
     bool hasWindows,
     bool hasRoofUnit,
   ) {
-    // 30-degree isometric projection vectors:
-    // dx1, dy1 along axis 1 (boulevard axis)
     final dx1 = w * cos30;
     final dy1 = -w * sin30;
-    // dx2, dy2 along axis 2 (cross-street axis)
     final dx2 = l * cos30;
     final dy2 = l * sin30;
 
@@ -413,10 +426,10 @@ class _IsometricCityPainter extends CustomPainter {
       ..close();
     canvas.drawPath(
       shadowPath,
-      Paint()..color = Colors.black.withValues(alpha: 0.06),
+      Paint()..color = Colors.black.withValues(alpha: 0.08),
     );
 
-    // 2. Left Face (Cool Shaded Side - Slate Medium)
+    // 2. Left Face (Cool Shaded Side - Modern Light Slate)
     final leftFace = Path()
       ..moveTo(pGroundFront.dx, pGroundFront.dy)
       ..lineTo(pGroundLeft.dx, pGroundLeft.dy)
@@ -425,31 +438,41 @@ class _IsometricCityPainter extends CustomPainter {
       ..close();
     canvas.drawPath(
       leftFace,
-      Paint()..color = const Color(0xFFCBD5E1),
+      Paint()..color = const Color(0xFFD6DEE8),
     );
     canvas.drawPath(
       leftFace,
       Paint()
-        ..color = const Color(0xFF94A3B8)
+        ..color = const Color(0xFFB0BDCE)
         ..strokeWidth = 0.8
         ..style = PaintingStyle.stroke,
     );
 
-    // Left Facade Window Strips
-    if (hasWindows && h > 35) {
-      final windowPaint = Paint()..color = const Color(0xFF64748B);
-      for (double floor = 12.0; floor < h - 10; floor += 13.0) {
-        final wPath = Path()
-          ..moveTo(pGroundFront.dx, pGroundFront.dy - floor)
-          ..lineTo(pGroundLeft.dx, pGroundLeft.dy - floor)
-          ..lineTo(pGroundLeft.dx, pGroundLeft.dy - floor - 5.5)
-          ..lineTo(pGroundFront.dx, pGroundFront.dy - floor - 5.5)
-          ..close();
-        canvas.drawPath(wPath, windowPaint);
+    // Architectural Punched Glass Windows on Left Face
+    if (hasWindows && h > 40) {
+      final windowPaint = Paint()..color = const Color(0xFF64748B).withValues(alpha: 0.35);
+      final numFloors = ((h - 20) / 16).floor();
+      for (int f = 0; f < numFloors; f++) {
+        final floorH = 14.0 + (f * 16.0);
+        for (double t = 0.22; t <= 0.78; t += 0.28) {
+          final winBottom = Offset(
+            pGroundFront.dx * (1 - t) + pGroundLeft.dx * t,
+            (pGroundFront.dy * (1 - t) + pGroundLeft.dy * t) - floorH,
+          );
+          final winW = 8.0;
+          final winH = 9.0;
+          final winPath = Path()
+            ..moveTo(winBottom.dx, winBottom.dy)
+            ..lineTo(winBottom.dx - winW * cos30, winBottom.dy - winW * -sin30)
+            ..lineTo(winBottom.dx - winW * cos30, winBottom.dy - winW * -sin30 - winH)
+            ..lineTo(winBottom.dx, winBottom.dy - winH)
+            ..close();
+          canvas.drawPath(winPath, windowPaint);
+        }
       }
     }
 
-    // 3. Right Face (Sun-facing Light Surface - Off-White)
+    // 3. Right Face (Sunlit Front Surface - Crisp Warm White)
     final rightFace = Path()
       ..moveTo(pGroundFront.dx, pGroundFront.dy)
       ..lineTo(pGroundRight.dx, pGroundRight.dy)
@@ -458,31 +481,41 @@ class _IsometricCityPainter extends CustomPainter {
       ..close();
     canvas.drawPath(
       rightFace,
-      Paint()..color = const Color(0xFFF1F5F9),
+      Paint()..color = const Color(0xFFF8FAFC),
     );
     canvas.drawPath(
       rightFace,
       Paint()
-        ..color = const Color(0xFFCBD5E1)
+        ..color = const Color(0xFFE2E8F0)
         ..strokeWidth = 0.8
         ..style = PaintingStyle.stroke,
     );
 
-    // Right Facade Window Strips
-    if (hasWindows && h > 35) {
-      final windowPaintRight = Paint()..color = const Color(0xFF94A3B8);
-      for (double floor = 12.0; floor < h - 10; floor += 13.0) {
-        final wPath = Path()
-          ..moveTo(pGroundFront.dx, pGroundFront.dy - floor)
-          ..lineTo(pGroundRight.dx, pGroundRight.dy - floor)
-          ..lineTo(pGroundRight.dx, pGroundRight.dy - floor - 5.5)
-          ..lineTo(pGroundFront.dx, pGroundFront.dy - floor - 5.5)
-          ..close();
-        canvas.drawPath(wPath, windowPaintRight);
+    // Architectural Punched Glass Windows on Right Face
+    if (hasWindows && h > 40) {
+      final windowPaintRight = Paint()..color = const Color(0xFF94A3B8).withValues(alpha: 0.38);
+      final numFloors = ((h - 20) / 16).floor();
+      for (int f = 0; f < numFloors; f++) {
+        final floorH = 14.0 + (f * 16.0);
+        for (double t = 0.22; t <= 0.78; t += 0.28) {
+          final winBottom = Offset(
+            pGroundFront.dx * (1 - t) + pGroundRight.dx * t,
+            (pGroundFront.dy * (1 - t) + pGroundRight.dy * t) - floorH,
+          );
+          final winW = 8.0;
+          final winH = 9.0;
+          final winPath = Path()
+            ..moveTo(winBottom.dx, winBottom.dy)
+            ..lineTo(winBottom.dx + winW * cos30, winBottom.dy + winW * sin30)
+            ..lineTo(winBottom.dx + winW * cos30, winBottom.dy + winW * sin30 - winH)
+            ..lineTo(winBottom.dx, winBottom.dy - winH)
+            ..close();
+          canvas.drawPath(winPath, windowPaintRight);
+        }
       }
     }
 
-    // 4. Top Face (Sunlit Roof Surface - Crisp White)
+    // 4. Top Face (Sunlit Roof Surface - Clean White)
     final topFace = Path()
       ..moveTo(pTopFront.dx, pTopFront.dy)
       ..lineTo(pTopRight.dx, pTopRight.dy)
@@ -496,9 +529,23 @@ class _IsometricCityPainter extends CustomPainter {
     canvas.drawPath(
       topFace,
       Paint()
-        ..color = const Color(0xFFE2E8F0)
-        ..strokeWidth = 1.2
+        ..color = const Color(0xFFCBD5E1)
+        ..strokeWidth = 1.0
         ..style = PaintingStyle.stroke,
+    );
+
+    // Inset Parapet Roof Border
+    final roofInset = Path()
+      ..moveTo(pTopFront.dx * 0.95 + pTopBack.dx * 0.05, pTopFront.dy * 0.95 + pTopBack.dy * 0.05)
+      ..lineTo(pTopRight.dx * 0.95 + pTopLeft.dx * 0.05, pTopRight.dy * 0.95 + pTopLeft.dy * 0.05)
+      ..lineTo(pTopBack.dx * 0.95 + pTopFront.dx * 0.05, pTopBack.dy * 0.95 + pTopFront.dy * 0.05)
+      ..lineTo(pTopLeft.dx * 0.95 + pTopRight.dx * 0.05, pTopLeft.dy * 0.95 + pTopRight.dy * 0.05)
+      ..close();
+    canvas.drawPath(
+      roofInset,
+      Paint()
+        ..color = const Color(0xFFF1F5F9)
+        ..style = PaintingStyle.fill,
     );
 
     // 5. Rooftop Mechanical / Elevator Penthouse Unit
@@ -567,7 +614,7 @@ class _IsometricCityPainter extends CustomPainter {
   /// Renders 3D Low-Poly Trees with Multi-Tier Foliage & Shadows
   void _draw3DTrees(Canvas canvas, Size size) {
     final treeLocations = [
-      // Sidewalk trees along Main Boulevard (North-West side)
+      // Sidewalk trees along Main Boulevard
       const Offset(350, 520),
       const Offset(420, 480),
       const Offset(490, 440),
@@ -579,7 +626,7 @@ class _IsometricCityPainter extends CustomPainter {
       const Offset(910, 200),
       const Offset(980, 160),
 
-      // Sidewalk trees along Main Boulevard (South-East side)
+      // South-East side trees
       const Offset(400, 640),
       const Offset(470, 600),
       const Offset(540, 560),
@@ -604,7 +651,7 @@ class _IsometricCityPainter extends CustomPainter {
       // Tree Ground Shadow
       canvas.drawOval(
         Rect.fromCenter(center: Offset(t.dx + 4, t.dy + 3), width: 22, height: 11),
-        Paint()..color = Colors.black.withValues(alpha: 0.08),
+        Paint()..color = Colors.black.withValues(alpha: 0.10),
       );
 
       // Tree Trunk
@@ -633,7 +680,6 @@ class _IsometricCityPainter extends CustomPainter {
   }
 
   /// Renders 3D Delivery Associate on White Electric Scooter with Green Thulirva Box
-  /// Matches the isometric 3/4 perspective in the master reference screenshot
   void _draw3DRiderAndScooty(Canvas canvas, Offset pos, double angle) {
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
@@ -664,8 +710,6 @@ class _IsometricCityPainter extends CustomPainter {
       Paint()..color = Colors.black.withValues(alpha: 0.24),
     );
 
-    // Rotate slightly to align with the tangent of the street avenue
-    // In our coordinate system, the boulevard runs at ~ -30 degrees
     canvas.rotate(angle);
 
     // 2. Wheels (Rear & Front)
@@ -673,26 +717,14 @@ class _IsometricCityPainter extends CustomPainter {
     final rimPaint = Paint()..color = const Color(0xFF94A3B8);
     final hubPaint = Paint()..color = const Color(0xFFE2E8F0);
 
-    // Rear Wheel (Center at x = -20, y = -6)
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(-20, -6), width: 17, height: 17),
-      tirePaint,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(-20, -6), width: 10, height: 10),
-      rimPaint,
-    );
+    // Rear Wheel
+    canvas.drawOval(Rect.fromCenter(center: const Offset(-20, -6), width: 17, height: 17), tirePaint);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(-20, -6), width: 10, height: 10), rimPaint);
     canvas.drawCircle(const Offset(-20, -6), 2.5, hubPaint);
 
-    // Front Wheel (Center at x = +22, y = -6)
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(22, -6), width: 17, height: 17),
-      tirePaint,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(22, -6), width: 10, height: 10),
-      rimPaint,
-    );
+    // Front Wheel
+    canvas.drawOval(Rect.fromCenter(center: const Offset(22, -6), width: 17, height: 17), tirePaint);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(22, -6), width: 10, height: 10), rimPaint);
     canvas.drawCircle(const Offset(22, -6), 2.5, hubPaint);
 
     // 3. Electric Scooter Chassis & Body Panels (Modern White Gloss)
@@ -722,7 +754,7 @@ class _IsometricCityPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Front Aerodynamic Apron / Fairing
+    // Front Apron
     final frontApron = Path()
       ..moveTo(12, -12)
       ..lineTo(22, -16)
@@ -731,14 +763,14 @@ class _IsometricCityPainter extends CustomPainter {
       ..close();
     canvas.drawPath(frontApron, bodyPaint);
 
-    // Headlight (Warm LED glow facing forward)
+    // Headlight (Warm LED glow)
     canvas.drawCircle(
       const Offset(20, -22),
       3.0,
       Paint()..color = const Color(0xFFFEF08A),
     );
 
-    // Handlebars & Grips with Round Rear-View Mirrors
+    // Handlebars & Grips
     canvas.drawLine(
       const Offset(10, -31),
       const Offset(20, -29),
@@ -749,7 +781,7 @@ class _IsometricCityPainter extends CustomPainter {
     );
     canvas.drawCircle(const Offset(11, -34), 1.8, Paint()..color = const Color(0xFF64748B));
 
-    // Rear Body Fairing (Covering rear wheel)
+    // Rear Body Fairing
     final rearFairing = Path()
       ..moveTo(-10, -12)
       ..lineTo(-2, -12)
@@ -759,20 +791,16 @@ class _IsometricCityPainter extends CustomPainter {
       ..close();
     canvas.drawPath(rearFairing, bodyPaint);
 
-    // Contoured Scooter Seat (Padded Black Leather)
+    // Contoured Seat
     final seatPath = Path()
       ..moveTo(-24, -20)
       ..lineTo(-2, -20)
       ..lineTo(2, -18)
       ..lineTo(-24, -18)
       ..close();
-    canvas.drawPath(
-      seatPath,
-      Paint()..color = const Color(0xFF0F172A),
-    );
+    canvas.drawPath(seatPath, Paint()..color = const Color(0xFF0F172A));
 
     // 4. Delivery Associate (Rider)
-    // Dark Charcoal Pants / Legs
     final legPath = Path()
       ..moveTo(-8, -20)
       ..lineTo(2, -18)
@@ -782,10 +810,7 @@ class _IsometricCityPainter extends CustomPainter {
       ..lineTo(4, -9)
       ..lineTo(-2, -15)
       ..close();
-    canvas.drawPath(
-      legPath,
-      Paint()..color = const Color(0xFF0F172A),
-    );
+    canvas.drawPath(legPath, Paint()..color = const Color(0xFF0F172A));
 
     // Torso: Signature Thulirva Green Windbreaker
     final jacketPaint = Paint()..color = const Color(0xFF15803D);
@@ -799,7 +824,7 @@ class _IsometricCityPainter extends CustomPainter {
       ..close();
     canvas.drawPath(torsoPath, jacketPaint);
 
-    // Arm extending forward to grip handlebar
+    // Arm
     canvas.drawLine(
       const Offset(2, -34),
       const Offset(14, -30),
@@ -808,40 +833,26 @@ class _IsometricCityPainter extends CustomPainter {
         ..strokeWidth = 4.0
         ..strokeCap = StrokeCap.round,
     );
-    // Glove on throttle
     canvas.drawCircle(const Offset(14, -30), 2.5, Paint()..color = const Color(0xFF0F172A));
 
-    // Green Helmet with Sunlit Visor
-    canvas.drawCircle(
-      const Offset(1, -45),
-      9.0,
-      jacketPaint,
-    );
-    canvas.drawCircle(
-      const Offset(-1, -47),
-      6.0,
-      jacketHighlight,
-    );
-    // Aerodynamic Dark Visor (Facing forward)
+    // Green Helmet with Visor
+    canvas.drawCircle(const Offset(1, -45), 9.0, jacketPaint);
+    canvas.drawCircle(const Offset(-1, -47), 6.0, jacketHighlight);
     final visorPath = Path()
       ..moveTo(2, -48)
       ..lineTo(9, -45)
       ..lineTo(6, -40)
       ..lineTo(1, -42)
       ..close();
-    canvas.drawPath(
-      visorPath,
-      Paint()..color = const Color(0xFF0F172A),
-    );
+    canvas.drawPath(visorPath, Paint()..color = const Color(0xFF0F172A));
 
     // 5. Signature Thulirva Emerald Green Cargo Delivery Box
-    // Isometric 3D Cube mounted on rear carrier rack
     const boxLeft = -37.0;
     const boxTop = -44.0;
     const boxW = 24.0;
     const boxH = 24.0;
 
-    // Rear cargo rack support metal tubes
+    // Carrier rack tubes
     canvas.drawLine(
       const Offset(-22, -18),
       const Offset(boxLeft + 4, boxTop + boxH),
@@ -857,38 +868,32 @@ class _IsometricCityPainter extends CustomPainter {
         ..strokeWidth = 2.5,
     );
 
-    // Side Face of Box (Facing viewer) - Rich Thulirva Green
+    // Side Face of Box
     final boxRect = Rect.fromLTWH(boxLeft, boxTop, boxW, boxH);
     canvas.drawRRect(
       RRect.fromRectAndRadius(boxRect, const Radius.circular(3)),
       Paint()..color = const Color(0xFF00A859),
     );
 
-    // Top Face of Box (Sunlit top lid)
+    // Top Face of Box
     final topFace = Path()
       ..moveTo(boxLeft, boxTop)
       ..lineTo(boxLeft + 8, boxTop - 6)
       ..lineTo(boxLeft + boxW + 8, boxTop - 6)
       ..lineTo(boxLeft + boxW, boxTop)
       ..close();
-    canvas.drawPath(
-      topFace,
-      Paint()..color = const Color(0xFF22C55E),
-    );
+    canvas.drawPath(topFace, Paint()..color = const Color(0xFF22C55E));
 
-    // Front/Right Edge Face of Box (Isometric Depth)
+    // Right Face of Box
     final edgeFace = Path()
       ..moveTo(boxLeft + boxW, boxTop)
       ..lineTo(boxLeft + boxW + 8, boxTop - 6)
       ..lineTo(boxLeft + boxW + 8, boxTop + boxH - 6)
       ..lineTo(boxLeft + boxW, boxTop + boxH)
       ..close();
-    canvas.drawPath(
-      edgeFace,
-      Paint()..color = const Color(0xFF15803D),
-    );
+    canvas.drawPath(edgeFace, Paint()..color = const Color(0xFF15803D));
 
-    // White "Thulirva" Brand Logo Emblem on the Side Face of Cargo Box
+    // White "Thulirva" Brand Logo Emblem
     final logoTextPainter = TextPainter(
       text: const TextSpan(
         children: [
@@ -917,17 +922,13 @@ class _IsometricCityPainter extends CustomPainter {
 
   /// Renders Origin Hub Pin: "Thulirva \n Dairy Hub"
   void _drawOriginHubPin(Canvas canvas, Offset pos, String label) {
-    // Drop shadow
     canvas.drawOval(
       Rect.fromCenter(center: Offset(pos.dx, pos.dy + 14), width: 34, height: 14),
       Paint()..color = Colors.black.withValues(alpha: 0.15),
     );
 
-    // Green Circular Badge
     final badgePaint = Paint()..color = const Color(0xFF00A859);
     canvas.drawCircle(Offset(pos.dx, pos.dy - 6), 18, badgePaint);
-
-    // Outer white border
     canvas.drawCircle(
       Offset(pos.dx, pos.dy - 6),
       18,
@@ -937,69 +938,41 @@ class _IsometricCityPainter extends CustomPainter {
         ..style = PaintingStyle.stroke,
     );
 
-    // Storefront / Hub Icon
     final iconPainter = TextPainter(
-      text: const TextSpan(
-        text: '🏪',
-        style: TextStyle(fontSize: 16),
-      ),
+      text: const TextSpan(text: '🏪', style: TextStyle(fontSize: 16)),
       textDirection: TextDirection.ltr,
     );
     iconPainter.layout();
-    iconPainter.paint(
-      canvas,
-      Offset(pos.dx - iconPainter.width / 2, pos.dy - 6 - iconPainter.height / 2),
-    );
+    iconPainter.paint(canvas, Offset(pos.dx - iconPainter.width / 2, pos.dy - 6 - iconPainter.height / 2));
 
-    // White Card Pill below: "Thulirva \n Dairy Hub"
-    final textSpan = TextSpan(
+    final textSpan = const TextSpan(
       children: [
-        const TextSpan(
+        TextSpan(
           text: 'Thulirva\n',
-          style: TextStyle(
-            color: Color(0xFF173F2D),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Color(0xFF173F2D), fontSize: 11, fontWeight: FontWeight.w700),
         ),
-        const TextSpan(
+        TextSpan(
           text: 'Dairy Hub',
-          style: TextStyle(
-            color: Color(0xFF173F2D),
-            fontSize: 12.5,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: Color(0xFF173F2D), fontSize: 12.5, fontWeight: FontWeight.w900),
         ),
       ],
     );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
+    final textPainter = TextPainter(text: textSpan, textAlign: TextAlign.center, textDirection: TextDirection.ltr);
     textPainter.layout();
 
     final pillWidth = textPainter.width + 24;
     const pillHeight = 36.0;
     final cardCenter = Offset(pos.dx, pos.dy + 32);
-    final pillRect = Rect.fromCenter(
-      center: cardCenter,
-      width: pillWidth,
-      height: pillHeight,
-    );
+    final pillRect = Rect.fromCenter(center: cardCenter, width: pillWidth, height: pillHeight);
 
-    // Card drop shadow
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect.shift(const Offset(0, 3)), const Radius.circular(10)),
       Paint()..color = Colors.black.withValues(alpha: 0.10),
     );
-
-    // Card background
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect, const Radius.circular(10)),
       Paint()..color = Colors.white,
     );
-    // Card border
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect, const Radius.circular(10)),
       Paint()
@@ -1008,25 +981,18 @@ class _IsometricCityPainter extends CustomPainter {
         ..style = PaintingStyle.stroke,
     );
 
-    textPainter.paint(
-      canvas,
-      Offset(cardCenter.dx - textPainter.width / 2, cardCenter.dy - textPainter.height / 2),
-    );
+    textPainter.paint(canvas, Offset(cardCenter.dx - textPainter.width / 2, cardCenter.dy - textPainter.height / 2));
   }
 
-  /// Renders Destination Pin: "Customer \n <Area>" matching reference image
+  /// Renders Destination Pin: "Customer \n <Area>"
   void _drawDestinationCustomerPin(Canvas canvas, Offset pos, String area) {
-    // Drop shadow under pin
     canvas.drawOval(
       Rect.fromCenter(center: Offset(pos.dx, pos.dy + 14), width: 34, height: 14),
       Paint()..color = Colors.black.withValues(alpha: 0.15),
     );
 
-    // Red Circular Badge
     final badgePaint = Paint()..color = const Color(0xFFDC2626);
     canvas.drawCircle(Offset(pos.dx, pos.dy - 6), 18, badgePaint);
-
-    // Outer white border
     canvas.drawCircle(
       Offset(pos.dx, pos.dy - 6),
       18,
@@ -1036,64 +1002,37 @@ class _IsometricCityPainter extends CustomPainter {
         ..style = PaintingStyle.stroke,
     );
 
-    // House / Customer Icon
     final iconPainter = TextPainter(
-      text: const TextSpan(
-        text: '🏠',
-        style: TextStyle(fontSize: 16),
-      ),
+      text: const TextSpan(text: '🏠', style: TextStyle(fontSize: 16)),
       textDirection: TextDirection.ltr,
     );
     iconPainter.layout();
-    iconPainter.paint(
-      canvas,
-      Offset(pos.dx - iconPainter.width / 2, pos.dy - 6 - iconPainter.height / 2),
-    );
+    iconPainter.paint(canvas, Offset(pos.dx - iconPainter.width / 2, pos.dy - 6 - iconPainter.height / 2));
 
-    // White Card Pill below red badge: "Customer \n <Area>"
     final textSpan = TextSpan(
       children: [
         const TextSpan(
           text: 'Customer\n',
-          style: TextStyle(
-            color: Color(0xFF64748B),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+          style: TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.w700),
         ),
         TextSpan(
           text: area,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontSize: 12.5,
-            fontWeight: FontWeight.w900,
-          ),
+          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12.5, fontWeight: FontWeight.w900),
         ),
       ],
     );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
+    final textPainter = TextPainter(text: textSpan, textAlign: TextAlign.center, textDirection: TextDirection.ltr);
     textPainter.layout();
 
     final pillWidth = textPainter.width + 24;
     const pillHeight = 36.0;
     final cardCenter = Offset(pos.dx, pos.dy + 32);
-    final pillRect = Rect.fromCenter(
-      center: cardCenter,
-      width: pillWidth,
-      height: pillHeight,
-    );
+    final pillRect = Rect.fromCenter(center: cardCenter, width: pillWidth, height: pillHeight);
 
-    // Card drop shadow
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect.shift(const Offset(0, 3)), const Radius.circular(10)),
       Paint()..color = Colors.black.withValues(alpha: 0.10),
     );
-
-    // Card background
     canvas.drawRRect(
       RRect.fromRectAndRadius(pillRect, const Radius.circular(10)),
       Paint()..color = Colors.white,
@@ -1106,10 +1045,7 @@ class _IsometricCityPainter extends CustomPainter {
         ..style = PaintingStyle.stroke,
     );
 
-    textPainter.paint(
-      canvas,
-      Offset(cardCenter.dx - textPainter.width / 2, cardCenter.dy - textPainter.height / 2),
-    );
+    textPainter.paint(canvas, Offset(cardCenter.dx - textPainter.width / 2, cardCenter.dy - textPainter.height / 2));
   }
 
   @override
@@ -1129,5 +1065,5 @@ class _BuildingData {
   final bool hasWindows;
   final bool hasRoofUnit;
 
-  _BuildingData(this.pos, this.w, this.l, this.h, [this.hasWindows = true, this.hasRoofUnit = false]);
+  _BuildingData(this.pos, this.w, this.l, this.h, this.hasWindows, this.hasRoofUnit);
 }

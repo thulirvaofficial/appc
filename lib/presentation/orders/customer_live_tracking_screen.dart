@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/services/routing_service.dart';
 import '../../core/utils/customer_bike_marker_generator.dart';
 import '../../data/models/order_model.dart';
 import '../../providers/order_provider.dart';
@@ -30,14 +31,21 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   // Camera & Perspective Settings (3D Isometric Master View)
   double _currentHeading = 45.0;
-  double _currentTilt = 55.0;
+  double _currentTilt = 52.0;
   bool _is3dView = true;
   final bool _trafficEnabled = false;
-  bool _showIsometricCity = true;
+
+  // View Mode: Real Google Maps 3D Live Delivery Tracking (Worldwide) vs 3D Isometric Stylized City
+  bool _showIsometricCity = false;
+  MapType _currentMapType = MapType.normal;
 
   // Custom Markers Cache
   BitmapDescriptor? _riderMarker;
   BitmapDescriptor? _hubMarker;
+  BitmapDescriptor? _customerMarker;
+
+  // Real Road Network Polyline Coordinates
+  List<LatLng> _roadPolylinePoints = [];
 
   // Padur Farm Hub Coordinates (Single Source of Truth)
   static const LatLng _padurHubPos = LatLng(12.8025, 80.2233);
@@ -47,7 +55,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     super.initState();
     _order = widget.initialOrder;
     _loadCustomMarkers();
+    _loadRealRoadRoute();
     _startLiveTelemetrySync();
+
     // Allow both portrait and landscape viewing for 3D live delivery tracking
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -61,7 +71,6 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   void dispose() {
     _telemetryTimer?.cancel();
     _mapController?.dispose();
-    // Reset orientation preferences when leaving tracking screen
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -87,12 +96,25 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   Future<void> _loadCustomMarkers() async {
     try {
-      final rider = await CustomerBikeMarkerGenerator.getRiderMarker(heading: _currentHeading);
-      final hub = await CustomerBikeMarkerGenerator.getHubPin();
+      final customerArea = (_order.city.isNotEmpty
+              ? _order.city
+              : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Thiruverkadu'))
+          .trim();
+
+      final rider = await CustomerBikeMarkerGenerator.getRiderMarker(
+        heading: _currentHeading,
+        isMoving: _order.orderStatus.toLowerCase() == 'out_for_delivery' ||
+            _order.orderStatus.toLowerCase() == 'in_transit' ||
+            _order.orderStatus.toLowerCase() == 'picked_up',
+      );
+      final hub = await CustomerBikeMarkerGenerator.getHubPin(name: 'Thulirva Dairy Hub');
+      final customer = await CustomerBikeMarkerGenerator.getCustomerPin(area: customerArea);
+
       if (mounted) {
         setState(() {
           _riderMarker = rider;
           _hubMarker = hub;
+          _customerMarker = customer;
         });
       }
     } catch (e) {
@@ -100,9 +122,26 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     }
   }
 
+  Future<void> _loadRealRoadRoute() async {
+    try {
+      final points = await RoutingService.getRealRoadPath(
+        origin: _padurHubPos,
+        destination: _resolvedCustomerPos,
+        rider: _resolvedRiderPos,
+      );
+      if (mounted && points.isNotEmpty) {
+        setState(() {
+          _roadPolylinePoints = points;
+        });
+      }
+    } catch (e) {
+      debugPrint('[CustomerTracking] Error loading real road route: $e');
+    }
+  }
+
   void _startLiveTelemetrySync() {
-    // 4-second continuous polling to ensure zero connection dropouts
-    _telemetryTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+    // 3.5-second polling for real-time GPS telemetry from centralized backend
+    _telemetryTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) async {
       try {
         final orderId = _order.id.toString();
         final freshOrder = await ref.read(orderProvider.notifier).fetchOrderDetails(orderId);
@@ -110,11 +149,14 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           final oldLat = _order.partnerLatitude;
           final oldLng = _order.partnerLongitude;
 
-          // Compute new heading if rider moved
-          if (freshOrder.partnerLatitude != null && freshOrder.partnerLongitude != null && oldLat != null && oldLng != null) {
+          // Compute directional heading if rider moved
+          if (freshOrder.partnerLatitude != null &&
+              freshOrder.partnerLongitude != null &&
+              oldLat != null &&
+              oldLng != null) {
             final dLat = freshOrder.partnerLatitude! - oldLat;
             final dLng = freshOrder.partnerLongitude! - oldLng;
-            if (dLat.abs() > 0.0001 || dLng.abs() > 0.0001) {
+            if (dLat.abs() > 0.00005 || dLng.abs() > 0.00005) {
               final radians = math.atan2(dLng, dLat);
               final degrees = (radians * 180 / math.pi + 360) % 360;
               _currentHeading = degrees;
@@ -126,13 +168,16 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             _order = freshOrder;
           });
 
-          // Smoothly animate camera along with rider if in 3D follow mode
-          if (_is3dView && _mapController != null && freshOrder.partnerLatitude != null && freshOrder.partnerLongitude != null) {
+          // Smoothly animate camera along with rider in 3D follow mode
+          if (_is3dView &&
+              _mapController != null &&
+              freshOrder.partnerLatitude != null &&
+              freshOrder.partnerLongitude != null) {
             _mapController!.animateCamera(
               CameraUpdate.newCameraPosition(
                 CameraPosition(
                   target: LatLng(freshOrder.partnerLatitude!, freshOrder.partnerLongitude!),
-                  zoom: 17.2,
+                  zoom: 17.5,
                   tilt: _currentTilt,
                   bearing: _currentHeading,
                 ),
@@ -189,7 +234,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       CameraUpdate.newCameraPosition(
         CameraPosition(
           target: _resolvedRiderPos,
-          zoom: 17.2,
+          zoom: 17.5,
           tilt: _currentTilt,
           bearing: _currentHeading,
         ),
@@ -200,14 +245,14 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   void _toggle3dPerspective() {
     setState(() {
       _is3dView = !_is3dView;
-      _currentTilt = _is3dView ? 55.0 : 0.0;
+      _currentTilt = _is3dView ? 52.0 : 0.0;
     });
     if (_mapController != null) {
       _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: _resolvedRiderPos,
-            zoom: _is3dView ? 17.2 : 16.0,
+            zoom: _is3dView ? 17.5 : 16.0,
             tilt: _currentTilt,
             bearing: _is3dView ? _currentHeading : 0.0,
           ),
@@ -221,7 +266,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     if (s == 'delivered' || s == 'collected') return 3;
     if (s == 'out_for_delivery' || s == 'in_transit' || s == 'picked_up' || s == 'pickup_confirmed') return 2;
     if (s == 'preparing' || s == 'processing' || s == 'assigned') return 1;
-    return 0; // placed / confirmed
+    return 0;
   }
 
   @override
@@ -240,28 +285,36 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     final distanceKm = _calculateDistanceKm(riderPos, customerPos);
     final etaMins = (distanceKm * 4.5).clamp(3, 30).round();
 
+    final customerArea = (_order.city.isNotEmpty
+            ? _order.city
+            : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Thiruverkadu'))
+        .trim();
+
+    // 1. Google Map Custom Markers
     final markers = <Marker>{
-      // 1. Padur Farm Hub Marker
+      // Origin Hub
       Marker(
         markerId: const MarkerId('padur_hub'),
         position: _padurHubPos,
         icon: _hubMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        anchor: const Offset(0.5, 1.0),
         infoWindow: const InfoWindow(
-          title: '🌾 Padur Farm Hub',
-          snippet: 'Thulirva Cold-Chain Processing Center',
+          title: '🌾 Thulirva Dairy Hub',
+          snippet: 'Padur Cold-Chain Processing Hub',
         ),
       ),
-      // 2. Customer Destination Doorstep
+      // Destination Customer Doorstep
       Marker(
         markerId: const MarkerId('destination'),
         position: customerPos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+        icon: _customerMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+        anchor: const Offset(0.5, 1.0),
         infoWindow: InfoWindow(
           title: '🏠 Delivery Address',
           snippet: '${_order.address}, ${_order.city}',
         ),
       ),
-      // 3. 3D Animated Scooty Rider Marker
+      // 3D Animated Scooty Rider
       Marker(
         markerId: const MarkerId('scooty_rider'),
         position: riderPos,
@@ -270,28 +323,39 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         flat: true,
         anchor: const Offset(0.5, 0.5),
         infoWindow: InfoWindow(
-          title: '🛵 $partnerName',
-          snippet: 'En route with your Farm Fresh delivery',
+          title: '🛵 $partnerName (En Route)',
+          snippet: 'ETA: $etaMins min (${distanceKm.toStringAsFixed(1)} km)',
         ),
       ),
     };
 
+    // 2. Glowing Green Real Road Network Polyline
+    final activeRoute = _roadPolylinePoints.isNotEmpty
+        ? _roadPolylinePoints
+        : [_padurHubPos, riderPos, customerPos];
+
     final polylines = <Polyline>{
+      // Outer Glowing Mint Green Ribbon
       Polyline(
-        polylineId: const PolylineId('route_to_customer'),
-        points: [_padurHubPos, riderPos, customerPos],
-        color: const Color(0xFF1B4D3E),
-        width: 6,
+        polylineId: const PolylineId('route_glow'),
+        points: activeRoute,
+        color: const Color(0x6622C55E),
+        width: 11,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+        jointType: JointType.round,
+      ),
+      // Core Emerald Green Road Path
+      Polyline(
+        polylineId: const PolylineId('route_core'),
+        points: activeRoute,
+        color: const Color(0xFF00A859),
+        width: 5,
         startCap: Cap.roundCap,
         endCap: Cap.roundCap,
         jointType: JointType.round,
       ),
     };
-
-    final customerArea = (_order.city.isNotEmpty
-            ? _order.city
-            : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Thiruverkadu'))
-        .trim();
 
     double routeProgress = 0.55;
     if (_currentStageIndex == 0) {
@@ -310,7 +374,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       backgroundColor: const Color(0xFFF1F5F9),
       body: Stack(
         children: [
-          // 1. Primary View: 3D Isometric City Scene (Matching User's Attached Master Reference)
+          // 1. Primary Live Map Engine (Real Google Maps 3D vs 3D Isometric Stylized City)
           if (_showIsometricCity)
             Positioned.fill(
               child: Thulirva3DIsometricCityView(
@@ -321,12 +385,12 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               ),
             )
           else
-            // Fallback: 3D Tilted Google Map with Extruded Buildings
             Positioned.fill(
               child: GoogleMap(
+                mapType: _currentMapType,
                 initialCameraPosition: CameraPosition(
                   target: riderPos,
-                  zoom: 17.0,
+                  zoom: 17.5,
                   tilt: _currentTilt,
                   bearing: _currentHeading,
                 ),
@@ -361,11 +425,22 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ),
           ),
 
-          // 3. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
+          // 3. Floating View Mode Toggle Pill (Instant Switch between Real Google 3D & 3D Isometric View)
           Positioned(
-            top: MediaQuery.of(context).padding.top + (isLandscape ? 58 : 68),
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 8 : 62),
+            left: isLandscape ? 280 : 16,
+            right: isLandscape ? null : 16,
+            child: Align(
+              alignment: isLandscape ? Alignment.centerLeft : Alignment.center,
+              child: _buildModeTogglePill(),
+            ),
+          ),
+
+          // 4. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 52 : 108),
             left: 16,
-            width: isLandscape ? 250 : 255,
+            width: isLandscape ? 250 : 240,
             child: _buildPartnerInfoCard(
               partnerName: partnerName,
               partnerPhone: partnerPhone,
@@ -377,7 +452,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ),
           ),
 
-          // 4. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
+          // 5. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
           Positioned(
             bottom: isLandscape ? 16 : 24,
             left: isLandscape ? 278 : 16,
@@ -450,6 +525,75 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     );
   }
 
+  Widget _buildModeTogglePill() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildPillTab(
+            label: '🗺️ Google 3D',
+            isSelected: !_showIsometricCity,
+            onTap: () {
+              if (_showIsometricCity) {
+                setState(() => _showIsometricCity = false);
+                _recenterOnRider();
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+          _buildPillTab(
+            label: '🏙️ 3D City',
+            isSelected: _showIsometricCity,
+            onTap: () {
+              if (!_showIsometricCity) {
+                setState(() => _showIsometricCity = true);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPillTab({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF00A859) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopRightActions() {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -471,23 +615,34 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         ),
         const SizedBox(width: 6),
         _buildCircularTopBtn(
-          icon: Icons.settings_outlined,
-          tooltip: 'Recenter on Rider',
+          icon: Icons.view_in_ar_rounded,
+          tooltip: 'Toggle 3D Perspective Tilt',
+          onTap: _toggle3dPerspective,
+          isActive: _is3dView,
+        ),
+        const SizedBox(width: 6),
+        _buildCircularTopBtn(
+          icon: Icons.my_location_rounded,
+          tooltip: 'Recenter on 3D Rider',
           onTap: _recenterOnRider,
         ),
         const SizedBox(width: 6),
         _buildCircularTopBtn(
           icon: Icons.layers_outlined,
-          tooltip: 'Toggle 3D Isometric View / Real Google Map View',
+          tooltip: 'Cycle Map Style (Google 3D / Satellite / Isometric)',
           onTap: () {
             setState(() {
-              _showIsometricCity = !_showIsometricCity;
-              if (!_showIsometricCity) {
-                _toggle3dPerspective();
+              if (_showIsometricCity) {
+                _showIsometricCity = false;
+                _currentMapType = MapType.normal;
+              } else if (_currentMapType == MapType.normal) {
+                _currentMapType = MapType.hybrid;
+              } else {
+                _showIsometricCity = true;
               }
             });
           },
-          isActive: _showIsometricCity,
+          isActive: !_showIsometricCity,
         ),
       ],
     );
@@ -574,7 +729,15 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                   child: Image.network(
                     photoFullUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF00A859), size: 26),
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/images/partner_kumar.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.person_rounded,
+                        color: Color(0xFF00A859),
+                        size: 26,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -807,6 +970,10 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Image.asset(
+                  'assets/images/partner_kumar.png',
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             IconButton(
