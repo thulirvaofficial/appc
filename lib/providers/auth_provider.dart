@@ -315,21 +315,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<String?> uploadProfilePhoto(String base64Image) async {
+  Future<String?> uploadProfilePhoto(String base64Image, {File? photoFile}) async {
     if (state.user == null) return null;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final api = ref.read(apiClientProvider);
+      dynamic postData;
+      if (photoFile != null && await photoFile.exists()) {
+        final cleanExt = photoFile.path.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+        postData = FormData.fromMap({
+          'photo': await MultipartFile.fromFile(
+            photoFile.path,
+            filename: 'profile_${state.user!.id}_${DateTime.now().millisecondsSinceEpoch}.$cleanExt',
+            contentType: DioMediaType('image', cleanExt == 'png' ? 'png' : 'jpeg'),
+          ),
+          'image': base64Image,
+        });
+      } else {
+        postData = {'photo': base64Image, 'image': base64Image};
+      }
+
       final res = await api.post(
         ApiEndpoints.profilePhoto,
-        data: {'photo': base64Image},
+        data: postData,
       );
       final data = res.data;
       if (data is Map && data['success'] == true) {
-        final photoUrl = (data['profile_photo'] ?? data['photoUrl'])?.toString();
+        final photoUrl = (data['profile_photo'] ?? data['photoUrl'] ?? data['url'])?.toString();
         if (photoUrl != null && state.user != null) {
           final updated = state.user!.copyWith(profilePhoto: photoUrl);
           await StorageService.saveUser(updated.toJson());
+          PaintingBinding.instance.imageCache.clear();
+          PaintingBinding.instance.imageCache.clearLiveImages();
           state = state.copyWith(user: updated, isLoading: false);
         } else {
           state = state.copyWith(isLoading: false);

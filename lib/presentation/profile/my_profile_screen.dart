@@ -82,10 +82,14 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
 
       setState(() => _isUploadingPhoto = true);
 
-      final bytes = await File(picked.path).readAsBytes();
+      final photoFile = File(picked.path);
+      final bytes = await photoFile.readAsBytes();
       final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
-      final res = await ref.read(authProvider.notifier).uploadProfilePhoto(base64Image);
+      final res = await ref.read(authProvider.notifier).uploadProfilePhoto(
+        base64Image,
+        photoFile: photoFile,
+      );
 
       if (mounted) {
         setState(() => _isUploadingPhoto = false);
