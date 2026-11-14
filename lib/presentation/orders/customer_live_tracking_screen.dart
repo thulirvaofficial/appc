@@ -28,7 +28,7 @@ class CustomerLiveTrackingScreen extends ConsumerStatefulWidget {
   ConsumerState<CustomerLiveTrackingScreen> createState() => _CustomerLiveTrackingScreenState();
 }
 
-class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackingScreen> {
+class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackingScreen> with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   late OrderModel _order;
   Timer? _telemetryTimer;
@@ -52,13 +52,53 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   // Real Road Network Polyline Coordinates
   List<LatLng> _roadPolylinePoints = [];
 
-  // Padur Farm Hub Coordinates (Single Source of Truth)
-  static const LatLng _padurHubPos = LatLng(12.8025, 80.2233);
+  // Central Distribution Hub Coordinates (Valasaravakkam, Chennai - Single Source of Truth)
+  static const LatLng _valasaravakkamHubPos = LatLng(13.0403, 80.1723);
+
+  // Smooth Road-Snapping & Movement Animation
+  AnimationController? _movementAnimController;
+  LatLng? _animatedRiderPos;
+  double _animatedHeading = 45.0;
+  LatLng? _previousSnappedPos;
+  LatLng? _targetSnappedPos;
+  double _previousHeading = 45.0;
+  double _targetHeading = 45.0;
+
+  // 100-Metre Customer Arrival Geofence state
+  bool _hasArrivedAtGeofence = false;
 
   @override
   void initState() {
     super.initState();
     _order = widget.initialOrder;
+
+    _movementAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    )..addListener(() {
+        if (!mounted || _previousSnappedPos == null || _targetSnappedPos == null) return;
+        final t = _movementAnimController!.value;
+        final curLat = _previousSnappedPos!.latitude +
+            t * (_targetSnappedPos!.latitude - _previousSnappedPos!.latitude);
+        final curLng = _previousSnappedPos!.longitude +
+            t * (_targetSnappedPos!.longitude - _previousSnappedPos!.longitude);
+
+        double diff = (_targetHeading - _previousHeading + 540) % 360 - 180;
+        final curHeading = (_previousHeading + t * diff + 360) % 360;
+
+        setState(() {
+          _animatedRiderPos = LatLng(curLat, curLng);
+          _animatedHeading = curHeading;
+        });
+      });
+
+    if (_order.partnerLatitude != null && _order.partnerLongitude != null) {
+      _updateRiderPosition(
+        LatLng(_order.partnerLatitude!, _order.partnerLongitude!),
+        _currentHeading,
+      );
+    }
+
     _loadCustomMarkers();
     _loadRealRoadRoute();
     _initSocket();
@@ -72,6 +112,12 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           setState(() {
             _order = fresh;
           });
+          if (fresh.partnerLatitude != null && fresh.partnerLongitude != null) {
+            _updateRiderPosition(
+              LatLng(fresh.partnerLatitude!, fresh.partnerLongitude!),
+              _currentHeading,
+            );
+          }
           _loadCustomMarkers();
           _loadRealRoadRoute();
         }
@@ -89,6 +135,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   @override
   void dispose() {
+    _movementAnimController?.dispose();
     _telemetryTimer?.cancel();
     _socket?.disconnect();
     _socket?.dispose();
@@ -140,21 +187,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         final heading = double.tryParse(data['heading']?.toString() ?? '') ?? _currentHeading;
 
         if (lat != null && lng != null) {
-          final oldLat = _order.partnerLatitude;
-          final oldLng = _order.partnerLongitude;
-
-          if (oldLat != null && oldLng != null) {
-            final dLat = lat - oldLat;
-            final dLng = lng - oldLng;
-            if (dLat.abs() > 0.00005 || dLng.abs() > 0.00005) {
-              final radians = math.atan2(dLng, dLat);
-              _currentHeading = (radians * 180 / math.pi + 360) % 360;
-            } else if (heading != 0) {
-              _currentHeading = heading;
-            }
-          } else if (heading != 0) {
-            _currentHeading = heading;
-          }
+          _updateRiderPosition(LatLng(lat, lng), heading);
 
           setState(() {
             _order = _order.copyWith(
@@ -169,10 +202,10 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             _mapController!.animateCamera(
               CameraUpdate.newCameraPosition(
                 CameraPosition(
-                  target: LatLng(lat, lng),
+                  target: _animatedRiderPos ?? LatLng(lat, lng),
                   zoom: 17.5,
                   tilt: _currentTilt,
-                  bearing: _currentHeading,
+                  bearing: _animatedHeading,
                 ),
               ),
             );
@@ -183,6 +216,16 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       _socket!.on('delivery:location_updated', handleLocationEvent);
       _socket!.on('delivery:location:update', handleLocationEvent);
       _socket!.on('partner:location:updated', handleLocationEvent);
+
+      void handleArrivalGeofence(dynamic data) {
+        if (!mounted) return;
+        setState(() {
+          _hasArrivedAtGeofence = true;
+        });
+      }
+
+      _socket!.on('order:geofence_arrival', handleArrivalGeofence);
+      _socket!.on('customer:geofence_arrival', handleArrivalGeofence);
 
       void handleStatusEvent(dynamic data) {
         if (!mounted || data is! Map) return;
@@ -231,6 +274,91 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     }
   }
 
+  MapEntry<LatLng, double> _snapPointToRoad(LatLng point) {
+    if (_roadPolylinePoints.isEmpty) {
+      return MapEntry(point, _currentHeading);
+    }
+    if (_roadPolylinePoints.length == 1) {
+      return MapEntry(_roadPolylinePoints.first, _currentHeading);
+    }
+
+    double minDistance = double.infinity;
+    LatLng closestPoint = point;
+    double roadHeading = _currentHeading;
+
+    for (int i = 0; i < _roadPolylinePoints.length - 1; i++) {
+      final a = _roadPolylinePoints[i];
+      final b = _roadPolylinePoints[i + 1];
+
+      final dx = b.longitude - a.longitude;
+      final dy = b.latitude - a.latitude;
+      final lengthSq = dx * dx + dy * dy;
+
+      LatLng proj;
+      if (lengthSq < 1e-12) {
+        proj = a;
+      } else {
+        final t = (((point.longitude - a.longitude) * dx +
+                    (point.latitude - a.latitude) * dy) /
+                lengthSq)
+            .clamp(0.0, 1.0);
+        proj = LatLng(a.latitude + t * dy, a.longitude + t * dx);
+      }
+
+      final dist = _calculateDistanceKm(point, proj);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestPoint = proj;
+        if (dx.abs() > 1e-7 || dy.abs() > 1e-7) {
+          final rad = math.atan2(dx, dy);
+          roadHeading = (rad * 180 / math.pi + 360) % 360;
+        }
+      }
+    }
+
+    // Within 150m buffer, snap to road polyline
+    if (minDistance <= 0.15) {
+      return MapEntry(closestPoint, roadHeading);
+    }
+    return MapEntry(point, roadHeading);
+  }
+
+  void _updateRiderPosition(LatLng rawPos, double? reportedHeading) {
+    final snapped = _snapPointToRoad(rawPos);
+    final targetPos = snapped.key;
+    final heading = (reportedHeading != null && reportedHeading > 0)
+        ? reportedHeading
+        : snapped.value;
+
+    final customerPos = _resolvedCustomerPos;
+    final distToCustomerKm = _calculateDistanceKm(targetPos, customerPos);
+    if (distToCustomerKm <= 0.10) {
+      _hasArrivedAtGeofence = true;
+    }
+
+    if (_animatedRiderPos == null) {
+      _animatedRiderPos = targetPos;
+      _previousSnappedPos = targetPos;
+      _targetSnappedPos = targetPos;
+      _previousHeading = heading;
+      _targetHeading = heading;
+      _animatedHeading = heading;
+      _currentHeading = heading;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    _previousSnappedPos = _animatedRiderPos;
+    _targetSnappedPos = targetPos;
+    _previousHeading = _animatedHeading;
+    _targetHeading = heading;
+    _currentHeading = heading;
+
+    _movementAnimController?.stop();
+    _movementAnimController?.reset();
+    _movementAnimController?.forward();
+  }
+
   Future<void> _loadCustomMarkers() async {
     try {
       final customerArea = (_order.city.isNotEmpty
@@ -239,12 +367,12 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           .trim();
 
       final rider = await CustomerBikeMarkerGenerator.getRiderMarker(
-        heading: _currentHeading,
+        heading: _animatedHeading,
         isMoving: _order.orderStatus.toLowerCase() == 'out_for_delivery' ||
             _order.orderStatus.toLowerCase() == 'in_transit' ||
             _order.orderStatus.toLowerCase() == 'picked_up',
       );
-      final hub = await CustomerBikeMarkerGenerator.getHubPin(name: 'Thulirva Dairy Hub');
+      final hub = await CustomerBikeMarkerGenerator.getHubPin(name: 'Thulirva Central Hub');
       final customer = await CustomerBikeMarkerGenerator.getCustomerPin(area: customerArea);
 
       if (mounted) {
@@ -262,7 +390,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   Future<void> _loadRealRoadRoute() async {
     try {
       final points = await RoutingService.getRealRoadPath(
-        origin: _padurHubPos,
+        origin: _valasaravakkamHubPos,
         destination: _resolvedCustomerPos,
         rider: _resolvedRiderPos,
       );
@@ -270,6 +398,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         setState(() {
           _roadPolylinePoints = points;
         });
+        if (_resolvedRiderPos != null) {
+          _updateRiderPosition(_resolvedRiderPos!, _currentHeading);
+        }
       }
     } catch (e) {
       debugPrint('[CustomerTracking] Error loading real road route: $e');
@@ -283,22 +414,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         final orderId = _order.id.toString();
         final freshOrder = await ref.read(orderProvider.notifier).fetchOrderTrackingDetails(orderId);
         if (freshOrder != null && mounted) {
-          final oldLat = _order.partnerLatitude;
-          final oldLng = _order.partnerLongitude;
-
-          // Compute directional heading if rider moved
-          if (freshOrder.partnerLatitude != null &&
-              freshOrder.partnerLongitude != null &&
-              oldLat != null &&
-              oldLng != null) {
-            final dLat = freshOrder.partnerLatitude! - oldLat;
-            final dLng = freshOrder.partnerLongitude! - oldLng;
-            if (dLat.abs() > 0.00005 || dLng.abs() > 0.00005) {
-              final radians = math.atan2(dLng, dLat);
-              final degrees = (radians * 180 / math.pi + 360) % 360;
-              _currentHeading = degrees;
-              _loadCustomMarkers();
-            }
+          if (freshOrder.partnerLatitude != null && freshOrder.partnerLongitude != null) {
+            _updateRiderPosition(
+              LatLng(freshOrder.partnerLatitude!, freshOrder.partnerLongitude!),
+              _currentHeading,
+            );
           }
 
           setState(() {
@@ -308,15 +428,14 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           // Smoothly animate camera along with rider in 3D follow mode
           if (_is3dView &&
               _mapController != null &&
-              freshOrder.partnerLatitude != null &&
-              freshOrder.partnerLongitude != null) {
+              _animatedRiderPos != null) {
             _mapController!.animateCamera(
               CameraUpdate.newCameraPosition(
                 CameraPosition(
-                  target: LatLng(freshOrder.partnerLatitude!, freshOrder.partnerLongitude!),
+                  target: _animatedRiderPos!,
                   zoom: 17.5,
                   tilt: _currentTilt,
-                  bearing: _currentHeading,
+                  bearing: _animatedHeading,
                 ),
               ),
             );
@@ -445,7 +564,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   void _recenterOnRider() {
     if (_mapController == null) return;
-    final rider = _resolvedRiderPos;
+    final rider = _animatedRiderPos ?? _resolvedRiderPos;
     if (rider != null) {
       _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
@@ -453,7 +572,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             target: rider,
             zoom: 17.5,
             tilt: _currentTilt,
-            bearing: _currentHeading,
+            bearing: _animatedHeading,
           ),
         ),
       );
@@ -465,7 +584,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   void _recenterOverview() {
     if (_mapController == null) return;
     final customer = _resolvedCustomerPos;
-    final rider = _resolvedRiderPos ?? _padurHubPos;
+    final rider = _animatedRiderPos ?? _resolvedRiderPos ?? _valasaravakkamHubPos;
 
     final south = math.min(customer.latitude, rider.latitude);
     final north = math.max(customer.latitude, rider.latitude);
@@ -488,14 +607,14 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       _currentTilt = _is3dView ? 52.0 : 0.0;
     });
     if (_mapController != null) {
-      final target = _resolvedRiderPos ?? _resolvedCustomerPos;
+      final target = _animatedRiderPos ?? _resolvedRiderPos ?? _resolvedCustomerPos;
       _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: target,
             zoom: _is3dView ? 17.5 : 15.0,
             tilt: _currentTilt,
-            bearing: _is3dView ? _currentHeading : 0.0,
+            bearing: _is3dView ? _animatedHeading : 0.0,
           ),
         ),
       );
@@ -521,7 +640,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     final partnerPhoto = partner.partnerPhoto ?? '';
     final rating = partner.partnerRating ?? 5.0;
 
-    final riderPos = _resolvedRiderPos;
+    final stageIdx = _currentStageIndex;
+    final isDelivered = stageIdx >= 3;
+    final isOutForDelivery = stageIdx == 2;
+
+    final riderPos = _animatedRiderPos ?? _resolvedRiderPos;
     final customerPos = _resolvedCustomerPos;
 
     final double distanceKm;
@@ -529,16 +652,28 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     final String etaSnippet;
     final String statusDisplay;
 
-    if (riderPos != null) {
+    if (isDelivered) {
+      distanceKm = 0.0;
+      etaMins = 0;
+      etaSnippet = 'Delivered at Doorstep';
+      statusDisplay = 'Delivered Successfully';
+    } else if (isOutForDelivery && riderPos != null) {
       distanceKm = _calculateDistanceKm(riderPos, customerPos);
-      etaMins = (distanceKm * 1.6).clamp(3, 120).round();
+      etaMins = (distanceKm * 1.6).clamp(2, 120).round();
       etaSnippet = 'ETA: $etaMins min (${distanceKm.toStringAsFixed(1)} km)';
-      statusDisplay = 'On the way';
-    } else {
-      distanceKm = _calculateDistanceKm(_padurHubPos, customerPos);
+      statusDisplay = _hasArrivedAtGeofence || distanceKm <= 0.10
+          ? 'Arrived at your location (Within 100m)'
+          : 'On the way to your doorstep';
+    } else if (isOutForDelivery) {
+      distanceKm = _calculateDistanceKm(_valasaravakkamHubPos, customerPos);
       etaMins = (distanceKm * 1.6).round();
-      etaSnippet = 'ETA: ~$etaMins min from Hub (${distanceKm.toStringAsFixed(1)} km)';
-      statusDisplay = 'Partner assigned • Connecting GPS';
+      etaSnippet = 'Out for delivery • Connecting GPS';
+      statusDisplay = 'Partner en route';
+    } else {
+      distanceKm = _calculateDistanceKm(_valasaravakkamHubPos, customerPos);
+      etaMins = (distanceKm * 1.6).round();
+      etaSnippet = 'Order being packed at Central Hub';
+      statusDisplay = 'Preparing Order (Valasaravakkam Hub)';
     }
 
     final customerArea = (_order.city.isNotEmpty
@@ -548,35 +683,38 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
     // 1. Google Map Custom Markers
     final markers = <Marker>{
-      // Origin Hub
-      Marker(
-        markerId: const MarkerId('padur_hub'),
-        position: _padurHubPos,
-        icon: _hubMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        anchor: const Offset(0.5, 1.0),
-        infoWindow: const InfoWindow(
-          title: '🌾 Thulirva Dairy Hub',
-          snippet: 'Padur Cold-Chain Processing Hub',
+      // Origin Hub (Shown during preparing and out for delivery)
+      if (!isDelivered)
+        Marker(
+          markerId: const MarkerId('valasaravakkam_hub'),
+          position: _valasaravakkamHubPos,
+          icon: _hubMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          anchor: const Offset(0.5, 1.0),
+          infoWindow: const InfoWindow(
+            title: '🌾 Thulirva Central Hub',
+            snippet: 'Valasaravakkam Hub, Chennai',
+          ),
         ),
-      ),
       // Destination Customer Doorstep
       Marker(
         markerId: const MarkerId('destination'),
         position: customerPos,
-        icon: _customerMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+        icon: _customerMarker ?? BitmapDescriptor.defaultMarkerWithHue(
+          isDelivered ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRose,
+        ),
         anchor: const Offset(0.5, 1.0),
         infoWindow: InfoWindow(
-          title: '🏠 Delivery Address',
+          title: isDelivered ? '✅ Delivered to Doorstep' : '🏠 Delivery Address',
           snippet: '${_order.address}, ${_order.city}',
         ),
       ),
-      // 3D Animated Scooty Rider (Displayed strictly when genuine GPS is streaming)
-      if (riderPos != null)
+      // 3D Animated Scooty Rider (Displayed STRICTLY when out for delivery & riderPos != null)
+      if (isOutForDelivery && riderPos != null)
         Marker(
           markerId: const MarkerId('scooty_rider'),
           position: riderPos,
           icon: _riderMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-          rotation: _currentHeading,
+          rotation: _animatedHeading,
           flat: true,
           anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
@@ -586,33 +724,56 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         ),
     };
 
-    // 2. Glowing Green Real Road Network Polyline
-    final activeRoute = _roadPolylinePoints.isNotEmpty
-        ? _roadPolylinePoints
-        : (riderPos != null ? [_padurHubPos, riderPos, customerPos] : [_padurHubPos, customerPos]);
+    // 2. Road Network Polylines
+    final Set<Polyline> polylines;
+    if (isDelivered) {
+      polylines = <Polyline>{}; // No polylines once delivered
+    } else if (isOutForDelivery) {
+      final activeRoute = _roadPolylinePoints.isNotEmpty
+          ? _roadPolylinePoints
+          : (riderPos != null
+              ? [_valasaravakkamHubPos, riderPos, customerPos]
+              : [_valasaravakkamHubPos, customerPos]);
 
-    final polylines = <Polyline>{
-      // Outer Glowing Mint Green Ribbon
-      Polyline(
-        polylineId: const PolylineId('route_glow'),
-        points: activeRoute,
-        color: const Color(0x6622C55E),
-        width: 11,
-        startCap: Cap.roundCap,
-        endCap: Cap.roundCap,
-        jointType: JointType.round,
-      ),
-      // Core Emerald Green Road Path
-      Polyline(
-        polylineId: const PolylineId('route_core'),
-        points: activeRoute,
-        color: const Color(0xFF00A859),
-        width: 5,
-        startCap: Cap.roundCap,
-        endCap: Cap.roundCap,
-        jointType: JointType.round,
-      ),
-    };
+      polylines = <Polyline>{
+        // Outer Glowing Mint Green Ribbon
+        Polyline(
+          polylineId: const PolylineId('route_glow'),
+          points: activeRoute,
+          color: const Color(0x6622C55E),
+          width: 11,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+          jointType: JointType.round,
+        ),
+        // Core Emerald Green Road Path
+        Polyline(
+          polylineId: const PolylineId('route_core'),
+          points: activeRoute,
+          color: const Color(0xFF00A859),
+          width: 5,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+          jointType: JointType.round,
+        ),
+      };
+    } else {
+      // Preparing stage: simple dotted preview from Hub to Customer
+      final previewRoute = _roadPolylinePoints.isNotEmpty
+          ? _roadPolylinePoints
+          : [_valasaravakkamHubPos, customerPos];
+      polylines = <Polyline>{
+        Polyline(
+          polylineId: const PolylineId('route_preview'),
+          points: previewRoute,
+          color: const Color(0x7794A3B8),
+          width: 4,
+          patterns: [PatternItem.dash(12), PatternItem.gap(6)],
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+        ),
+      };
+    }
 
     double routeProgress = 0.55;
     if (_currentStageIndex == 0) {
@@ -636,7 +797,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             Positioned.fill(
               child: Thulirva3DIsometricCityView(
                 progress: routeProgress,
-                hubName: 'Thulirva Dairy Hub',
+                hubName: 'Thulirva Central Hub',
                 customerArea: customerArea,
                 onRecenter: _recenterOnRider,
               ),
@@ -647,9 +808,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                 mapType: _currentMapType,
                 initialCameraPosition: CameraPosition(
                   target: riderPos ?? customerPos,
-                  zoom: riderPos != null ? 17.5 : 12.0,
+                  zoom: riderPos != null ? 17.5 : 14.5,
                   tilt: _currentTilt,
-                  bearing: _currentHeading,
+                  bearing: _animatedHeading,
                 ),
                 markers: markers,
                 polylines: polylines,
@@ -697,9 +858,18 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ),
           ),
 
-          // 4. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
+          // 4. Geofence 100m Arrival Alert Banner
+          if (_hasArrivedAtGeofence && isOutForDelivery)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + (isLandscape ? 48 : 58),
+              left: 16,
+              right: 16,
+              child: _buildArrivalGeofenceBanner(),
+            ),
+
+          // 5. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
           Positioned(
-            top: MediaQuery.of(context).padding.top + (isLandscape ? 52 : 108),
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 52 : (_hasArrivedAtGeofence && isOutForDelivery ? 128 : 108)),
             left: 16,
             width: isLandscape ? 250 : 240,
             child: _buildPartnerInfoCard(
@@ -710,10 +880,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               rating: rating,
               statusDisplay: statusDisplay,
               etaSnippet: etaSnippet,
+              isDelivered: isDelivered,
             ),
           ),
 
-          // 5. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
+          // 6. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
           Positioned(
             bottom: isLandscape ? 16 : 24,
             left: isLandscape ? 278 : 16,
@@ -945,6 +1116,70 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     );
   }
 
+  Widget _buildArrivalGeofenceBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF00A859),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00A859).withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'Your Thulirva Delivery Partner Has Arrived!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Your delivery partner has reached your location and is within 100 metres. Please be ready to receive your order.',
+                  style: TextStyle(
+                    color: Color(0xFFE2E8F0),
+                    fontSize: 11,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _hasArrivedAtGeofence = false;
+              });
+            },
+            child: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPartnerInfoCard({
     required String partnerName,
     required String? partnerPhone,
@@ -953,6 +1188,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     required double rating,
     required String statusDisplay,
     required String etaSnippet,
+    bool isDelivered = false,
   }) {
     final photoFullUrl = ApiEndpoints.resolveImageUrl(partnerPhoto);
 
@@ -1073,12 +1309,20 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           // 1. Status
           Row(
             children: [
-              const Icon(Icons.two_wheeler_rounded, size: 15, color: Color(0xFF00A859)),
+              Icon(
+                isDelivered ? Icons.check_circle_rounded : Icons.two_wheeler_rounded,
+                size: 15,
+                color: const Color(0xFF00A859),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   statusDisplay,
-                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDelivered ? const Color(0xFF00A859) : const Color(0xFF0F172A),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1090,7 +1334,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           // 2. Dynamic Road ETA & Distance
           Row(
             children: [
-              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF00A859)),
+              Icon(
+                isDelivered ? Icons.task_alt_rounded : Icons.access_time_rounded,
+                size: 15,
+                color: const Color(0xFF00A859),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1106,17 +1354,34 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
           // 3. Call Partner Button (Active phone dialer launch)
           InkWell(
-            onTap: () => _callPartner(partnerPhone),
+            onTap: isDelivered
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Order delivered. Contact customer support if you need assistance.'),
+                        backgroundColor: Color(0xFF00A859),
+                      ),
+                    );
+                  }
+                : () => _callPartner(partnerPhone),
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
-                children: const [
-                  Icon(Icons.phone_rounded, size: 15, color: Color(0xFF00A859)),
-                  SizedBox(width: 8),
+                children: [
+                  Icon(
+                    Icons.phone_rounded,
+                    size: 15,
+                    color: isDelivered ? const Color(0xFF94A3B8) : const Color(0xFF00A859),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    'Call Partner',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF00A859)),
+                    isDelivered ? 'Delivery Completed' : 'Call Partner',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDelivered ? const Color(0xFF94A3B8) : const Color(0xFF00A859),
+                    ),
                   ),
                 ],
               ),
@@ -1124,19 +1389,29 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           ),
           const SizedBox(height: 4),
 
-          // 4. In-App Chat Button (Direct in-app messaging modal)
+          // 4. In-App Chat Button (Direct in-app messaging modal, locked if delivered)
           InkWell(
-            onTap: () => _openChatSheet(context, partnerName, partnerPhone),
+            onTap: isDelivered
+                ? null
+                : () => _openChatSheet(context, partnerName, partnerPhone),
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
-                children: const [
-                  Icon(Icons.chat_bubble_outline_rounded, size: 15, color: Color(0xFF00A859)),
-                  SizedBox(width: 8),
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 15,
+                    color: isDelivered ? const Color(0xFF94A3B8) : const Color(0xFF00A859),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    'In-App Chat',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF00A859)),
+                    isDelivered ? 'Chat Closed (Delivered)' : 'In-App Chat',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDelivered ? const Color(0xFF94A3B8) : const Color(0xFF00A859),
+                    ),
                   ),
                 ],
               ),
@@ -1145,23 +1420,24 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           const SizedBox(height: 4),
 
           // 5. WhatsApp Direct Option
-          InkWell(
-            onTap: () => _openWhatsAppChat(partnerPhone),
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: const [
-                  Icon(Icons.chat_outlined, size: 15, color: Color(0xFF10B981)),
-                  SizedBox(width: 8),
-                  Text(
-                    'WhatsApp',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
-                  ),
-                ],
+          if (!isDelivered)
+            InkWell(
+              onTap: () => _openWhatsAppChat(partnerPhone),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: const [
+                    Icon(Icons.chat_outlined, size: 15, color: Color(0xFF10B981)),
+                    SizedBox(width: 8),
+                    Text(
+                      'WhatsApp',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

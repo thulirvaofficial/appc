@@ -48,6 +48,14 @@ class _InAppChatSheetState extends State<InAppChatSheet> {
     super.initState();
     _fetchMessages();
     _setupSocketListener();
+    _markAsRead();
+  }
+
+  Future<void> _markAsRead() async {
+    try {
+      final url = '${ApiEndpoints.baseUrl}/orders/${widget.orderId}/chat/read';
+      await _dio.post(url, data: {'role': 'customer'});
+    } catch (_) {}
   }
 
   @override
@@ -70,7 +78,23 @@ class _InAppChatSheetState extends State<InAppChatSheet> {
               _messages.add(Map<String, dynamic>.from(data));
             });
             _scrollToBottom();
+            _markAsRead();
           }
+        }
+      });
+
+      widget.socket!.on('chat:read', (data) {
+        if (!mounted || data is! Map) return;
+        final msgOrderId = data['order_id']?.toString();
+        if (msgOrderId == widget.orderId.toString()) {
+          setState(() {
+            for (final m in _messages) {
+              if (m['sender'] == 'customer') {
+                m['is_read'] = true;
+                m['status'] = 'read';
+              }
+            }
+          });
         }
       });
     }
@@ -451,12 +475,29 @@ class _InAppChatSheetState extends State<InAppChatSheet> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                timeStr,
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: isMe ? Colors.white70 : const Color(0xFF94A3B8),
-                                ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    timeStr,
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      color: isMe ? Colors.white70 : const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      (msg['status'] == 'read' || msg['is_read'] == true)
+                                          ? Icons.done_all_rounded
+                                          : Icons.done_rounded,
+                                      size: 13,
+                                      color: (msg['status'] == 'read' || msg['is_read'] == true)
+                                          ? const Color(0xFF93C5FD)
+                                          : Colors.white70,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),

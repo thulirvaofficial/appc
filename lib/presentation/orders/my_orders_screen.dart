@@ -736,7 +736,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (!isPickup && sStatus != 'cancelled' && sStatus != 'failed') ...[
+                    if (!isPickup && (sStatus == 'out_for_delivery' || sStatus == 'in_transit' || sStatus == 'shipped' || sStatus == 'picked_up')) ...[
                       InkWell(
                         onTap: () {
                           Navigator.push(
@@ -1042,42 +1042,30 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (sub.status.toLowerCase() == 'active') ...[
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CustomerLiveTrackingScreen(initialOrder: sub.toOrderModel()),
-                            ),
-                          );
-                        },
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
                         borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.forestGreen,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.navigation_rounded, size: 12, color: Colors.white),
-                              SizedBox(width: 4),
-                              Text(
-                                'Live Track',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
                       ),
-                      const SizedBox(width: 8),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.schedule_rounded, size: 12, color: AppColors.forestGreen),
+                          SizedBox(width: 4),
+                          Text(
+                            'Daily 6:00 - 7:00 AM',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.forestGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     const Text(
                       'View Details',
                       style: TextStyle(
