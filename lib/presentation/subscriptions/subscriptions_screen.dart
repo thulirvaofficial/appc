@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/cart_notification_service.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/thulirva_app_bar.dart';
+import 'customer_subscription_details_screen.dart';
 import 'subscribe_modal.dart';
 
 class SubscriptionsScreen extends ConsumerStatefulWidget {
@@ -28,6 +30,7 @@ class SubscriptionsScreen extends ConsumerStatefulWidget {
 class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
   late int _selectedTabIndex;
   String _selectedCategory = 'All';
+  String _mySubFilter = 'All';
 
   @override
   void initState() {
@@ -414,13 +417,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                         description: plan.description,
                       );
                       ref.read(cartProvider.notifier).addToCart(prod);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('✓ ${plan.productName} subscription added to cart!'),
-                          backgroundColor: AppColors.forestGreen,
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
+                      CartNotificationService.show(productName: plan.productName, context: context);
                     },
                   );
                 },
@@ -831,200 +828,388 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: subs.length,
-      itemBuilder: (context, index) {
-        final sub = subs[index];
-        final isActive = sub.status.toLowerCase() == 'active';
-        final subImg = ApiEndpoints.resolveImageUrl(sub.productImage ?? '');
+    final filteredSubs = subs.where((s) {
+      if (_mySubFilter == 'All') return true;
+      final st = s.status.toLowerCase();
+      final pst = s.paymentStatus.toLowerCase();
+      if (_mySubFilter == 'Pending Approval') {
+        return st.contains('pending') || pst.contains('pending') || pst.contains('verification');
+      }
+      if (_mySubFilter == 'Active') {
+        return s.isActive;
+      }
+      if (_mySubFilter == 'Expired') {
+        return s.isExpired;
+      }
+      if (_mySubFilter == 'Rejected') {
+        return s.isRejected;
+      }
+      return true;
+    }).toList();
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 14),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE5EDE2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      color: const Color(0xFFFAF7EE),
-                      child: subImg.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: subImg,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => const Icon(Icons.local_drink, color: AppColors.forestGreen, size: 28),
-                            )
-                          : const Icon(Icons.local_drink, color: AppColors.forestGreen, size: 28),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          sub.productName.isNotEmpty ? sub.productName : 'Fresh Cow Milk',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15.5,
-                            color: AppColors.forestGreen,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${sub.frequency} • Qty: ${sub.quantity}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF6E8072), fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      sub.status.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isActive ? AppColors.forestGreen : AppColors.pending,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FBF8),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5EDE2)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Filter Chips for Status Classification
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSubStatusChip('All', subs.length),
+                const SizedBox(width: 8),
+                _buildSubStatusChip(
+                  'Pending Approval',
+                  subs.where((s) => s.status.toLowerCase().contains('pending') || s.paymentStatus.toLowerCase().contains('pending') || s.paymentStatus.toLowerCase().contains('verification')).length,
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 14, color: AppColors.forestGreen),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Slot: ${sub.deliverySlot}',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E)),
-                          ),
-                        ),
-                      ],
+                const SizedBox(width: 8),
+                _buildSubStatusChip('Active', subs.where((s) => s.isActive).length),
+                const SizedBox(width: 8),
+                _buildSubStatusChip('Expired', subs.where((s) => s.isExpired).length),
+                const SizedBox(width: 8),
+                _buildSubStatusChip('Rejected', subs.where((s) => s.isRejected).length),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        if (filteredSubs.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+            child: Center(
+              child: Text(
+                'No subscriptions matching "$_mySubFilter"',
+                style: const TextStyle(color: Color(0xFF6E8072), fontSize: 13),
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: filteredSubs.length,
+            itemBuilder: (context, index) {
+              final sub = filteredSubs[index];
+              final isActive = sub.isActive;
+              final isRejected = sub.isRejected;
+              final isPending = sub.isPendingApproval;
+              final subImg = ApiEndpoints.resolveImageUrl(sub.productImage ?? '');
+
+              Color statusBg = const Color(0xFFE8F5E9);
+              Color statusColor = AppColors.forestGreen;
+              String statusLabel = sub.status.toUpperCase();
+
+              if (isRejected) {
+                statusBg = const Color(0xFFFFEBEE);
+                statusColor = AppColors.cancelled;
+                statusLabel = 'REJECTED';
+              } else if (isPending) {
+                statusBg = const Color(0xFFFFF3E0);
+                statusColor = AppColors.pending;
+                statusLabel = 'PENDING APPROVAL';
+              } else if (sub.isExpired) {
+                statusBg = const Color(0xFFEEEEEE);
+                statusColor = const Color(0xFF757575);
+                statusLabel = 'EXPIRED';
+              }
+
+              return InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CustomerSubscriptionDetailsScreen(subscription: sub),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 14, color: AppColors.forestGreen),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Started: ${sub.startDate} • ${sub.daysRemaining} days left',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E)),
-                          ),
-                        ),
-                      ],
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isRejected
+                          ? const Color(0xFFFFCDD2)
+                          : (isPending ? const Color(0xFFFFE0B2) : const Color(0xFFE5EDE2)),
+                      width: isRejected || isPending ? 1.5 : 1.0,
                     ),
-                    if (sub.address.isNotEmpty) ...[
-                      const SizedBox(height: 5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on_outlined, size: 14, color: AppColors.forestGreen),
-                          const SizedBox(width: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              color: const Color(0xFFFAF7EE),
+                              child: subImg.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: subImg,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) => const Icon(Icons.local_drink, color: AppColors.forestGreen, size: 28),
+                                    )
+                                  : const Icon(Icons.local_drink, color: AppColors.forestGreen, size: 28),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  sub.productName.isNotEmpty ? sub.productName : 'Fresh Cow Milk',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15.5,
+                                    color: AppColors.forestGreen,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${sub.frequency} • Qty: ${sub.quantity} • Sub ID: ${sub.id}',
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E8072), fontWeight: FontWeight.w500),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusBg,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             child: Text(
-                              sub.address,
-                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E8072)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              statusLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: statusColor,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Total Plan Price', style: TextStyle(fontSize: 10.5, color: Color(0xFF6E8072))),
-                      Text(
-                        '₹${sub.totalPrice.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.forestGreen,
+                      const SizedBox(height: 10),
+
+                      // Rejection Alert Box (if rejected by Admin)
+                      if (isRejected && (sub.rejectionReason != null && sub.rejectionReason!.isNotEmpty)) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFFCDD2)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.error_outline, size: 15, color: AppColors.cancelled),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Rejected: ${sub.rejectionReason}',
+                                  style: const TextStyle(fontSize: 11.5, color: AppColors.cancelled, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 10),
+                      ],
+
+                      // Schedule, Slot & Address Box
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FBF8),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5EDE2)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time, size: 14, color: AppColors.forestGreen),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Slot: ${sub.deliverySlot}',
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E)),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: sub.paymentStatus.toLowerCase().contains('verif') || sub.paymentStatus.toLowerCase() == 'paid'
+                                        ? const Color(0xFFE8F5E9)
+                                        : const Color(0xFFFFF3E0),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    sub.paymentStatus.toLowerCase().contains('verif') ? 'Verified' : 'Payment: ${sub.paymentStatus}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: sub.paymentStatus.toLowerCase().contains('verif') ? AppColors.forestGreen : AppColors.pending,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today, size: 14, color: AppColors.forestGreen),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Started: ${sub.startDate} • ${sub.daysRemaining > 0 ? '${sub.daysRemaining} days left' : 'Expired'}',
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (sub.address.isNotEmpty) ...[
+                              const SizedBox(height: 5),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.location_on_outlined, size: 14, color: AppColors.forestGreen),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      sub.address,
+                                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E8072)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Total Plan Price', style: TextStyle(fontSize: 10.5, color: Color(0xFF6E8072))),
+                              Text(
+                                '₹${sub.totalPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.forestGreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => CustomerSubscriptionDetailsScreen(subscription: sub),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.visibility_outlined, size: 14),
+                                label: const Text('Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.forestGreen,
+                                  side: const BorderSide(color: Color(0xFFC8E6C9)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isActive)
+                                OutlinedButton(
+                                  onPressed: () async {
+                                    await ref.read(subscriptionProvider.notifier).pauseSubscription(sub.id);
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.pending,
+                                    side: const BorderSide(color: AppColors.pending),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  ),
+                                  child: const Text('Pause', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                )
+                              else if (!isRejected && !sub.isExpired)
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    await ref.read(subscriptionProvider.notifier).resumeSubscription(sub.id);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.forestGreen,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  ),
+                                  child: const Text('Resume', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      if (isActive)
-                        OutlinedButton(
-                          onPressed: () async {
-                            await ref.read(subscriptionProvider.notifier).pauseSubscription(sub.id);
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.pending,
-                            side: const BorderSide(color: AppColors.pending),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          ),
-                          child: const Text('Pause', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                        )
-                      else
-                        ElevatedButton(
-                          onPressed: () async {
-                            await ref.read(subscriptionProvider.notifier).resumeSubscription(sub.id);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.forestGreen,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          ),
-                          child: const Text('Resume', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                ),
+              );
+            },
           ),
-        );
-      },
+      ],
+    );
+  }
+
+  Widget _buildSubStatusChip(String label, int count) {
+    final isSel = _mySubFilter == label;
+    return GestureDetector(
+      onTap: () => setState(() => _mySubFilter = label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSel ? AppColors.forestGreen : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSel ? AppColors.forestGreen : const Color(0xFFD6E2D5),
+            width: isSel ? 1.5 : 1.0,
+          ),
+        ),
+        child: Text(
+          '$label ($count)',
+          style: TextStyle(
+            color: isSel ? Colors.white : AppColors.forestGreen,
+            fontSize: 11.5,
+            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }

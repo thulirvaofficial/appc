@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/category_provider.dart';
-import '../../providers/product_provider.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/my_orders_screen.dart';
@@ -13,6 +10,7 @@ import '../profile/about_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../profile/addresses_screen.dart';
 import '../profile/offers_screen.dart';
+import 'app_settings_dialog.dart';
 
 class SideMenuDrawer extends ConsumerWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -126,7 +124,7 @@ class SideMenuDrawer extends ConsumerWidget {
                     onTap: () {
                       Navigator.pop(context);
                       if (onSelectTab != null) {
-                        onSelectTab!(4);
+                        onSelectTab!(3);
                       } else {
                         Navigator.push(
                           context,
@@ -192,7 +190,7 @@ class SideMenuDrawer extends ConsumerWidget {
                     title: 'Settings',
                     onTap: () {
                       Navigator.pop(context);
-                      _showServerSettingsDialog(context, ref);
+                      AppSettingsDialog.show(context);
                     },
                   ),
                   const Divider(height: 16),
@@ -303,67 +301,6 @@ class SideMenuDrawer extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close', style: TextStyle(color: AppColors.forestGreen)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showServerSettingsDialog(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(text: ApiEndpoints.baseUrl);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
-            Icon(Icons.dns, color: AppColors.forestGreen),
-            SizedBox(width: 8),
-            Text('API Server Settings', style: TextStyle(color: AppColors.forestGreen, fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter your backend API URL:\n(e.g. Render, Railway, Wi-Fi IP or Localhost)',
-              style: TextStyle(fontSize: 12.5, color: AppColors.textMid),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: 'https://backend-fprs.onrender.com/api',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textLight)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.forestGreen),
-            onPressed: () {
-              final newUrl = controller.text.trim();
-              if (newUrl.isNotEmpty) {
-                ApiEndpoints.setBaseUrl(newUrl);
-                ref.read(productProvider.notifier).fetchProducts();
-                ref.read(categoryProvider.notifier).fetchCategories();
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✓ Server URL updated to: $newUrl'),
-                    backgroundColor: AppColors.forestGreen,
-                  ),
-                );
-              }
-            },
-            child: const Text('Save & Connect', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

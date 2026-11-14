@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_colors.dart';
-import '../providers/cart_provider.dart';
-import 'cart/cart_screen.dart';
+import '../providers/order_provider.dart';
 import 'categories/categories_screen.dart';
 import 'home/home_screen.dart';
 import 'orders/my_orders_screen.dart';
@@ -22,14 +21,22 @@ class MainWrapper extends ConsumerStatefulWidget {
 class _MainWrapperState extends ConsumerState<MainWrapper> {
   late int _currentIndex;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final List<int> _tabHistory = [];
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _tabHistory.add(_currentIndex);
   }
 
   void _onTabTapped(int index) {
+    if (index == 3) {
+      ref.read(orderProvider.notifier).fetchOrders();
+    }
+    if (_currentIndex != index) {
+      _tabHistory.add(index);
+    }
     setState(() => _currentIndex = index);
   }
 
@@ -39,27 +46,33 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final cartState = ref.watch(cartProvider);
-    final cartCount = cartState.totalItemCount;
-
     final screens = [
       HomeScreen(onOpenDrawer: openDrawer, onNavigateToTab: _onTabTapped),
       CategoriesScreen(onNavigateToTab: _onTabTapped),
       SubscriptionsScreen(onNavigateToTab: _onTabTapped),
-      CartScreen(onContinueShopping: () => _onTabTapped(0)),
       MyOrdersScreen(onShopNow: () => _onTabTapped(0)),
       ProfileScreen(onSelectTab: _onTabTapped),
     ];
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: AppColors.lightCream,
-      drawer: SideMenuDrawer(onSelectTab: _onTabTapped),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: Container(
+    return PopScope(
+      canPop: _tabHistory.length <= 1,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _tabHistory.length > 1) {
+          setState(() {
+            _tabHistory.removeLast();
+            _currentIndex = _tabHistory.last;
+          });
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AppColors.lightCream,
+        drawer: SideMenuDrawer(onSelectTab: _onTabTapped),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: screens,
+        ),
+        bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           border: const Border(top: BorderSide(color: Color(0xFFE5EDE2), width: 1)),
@@ -92,25 +105,18 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
                 ),
                 _buildNavItem(
                   index: 2,
-                  label: 'Subscription',
+                  label: 'Subscriptions',
                   icon: Icons.calendar_month_outlined,
                   activeIcon: Icons.calendar_month,
                 ),
                 _buildNavItem(
                   index: 3,
-                  label: 'Cart',
-                  icon: Icons.shopping_cart_outlined,
-                  activeIcon: Icons.shopping_cart,
-                  badgeCount: cartCount,
-                ),
-                _buildNavItem(
-                  index: 4,
                   label: 'Orders',
                   icon: Icons.receipt_long_outlined,
                   activeIcon: Icons.receipt_long,
                 ),
                 _buildNavItem(
-                  index: 5,
+                  index: 4,
                   label: 'Profile',
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
@@ -120,8 +126,9 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNavItem({
     required int index,

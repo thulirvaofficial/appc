@@ -1,47 +1,143 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/api_endpoints.dart';
 import '../data/models/order_model.dart';
+import '../data/models/subscription_model.dart';
 import 'api_provider.dart';
 import 'auth_provider.dart';
 
+enum CustomerOrderItemType { product, subscription }
+
+class CustomerOrderFeedItem {
+  final CustomerOrderItemType type;
+  final OrderModel? productOrder;
+  final SubscriptionModel? subscriptionOrder;
+  final DateTime createdDateTime;
+
+  CustomerOrderFeedItem.product(this.productOrder)
+      : type = CustomerOrderItemType.product,
+        subscriptionOrder = null,
+        createdDateTime = _parseDate(productOrder?.createdAt);
+
+  CustomerOrderFeedItem.subscription(this.subscriptionOrder)
+      : type = CustomerOrderItemType.subscription,
+        productOrder = null,
+        createdDateTime = _parseDate(subscriptionOrder?.createdAt ?? subscriptionOrder?.startDate);
+
+  static DateTime _parseDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return DateTime.now();
+    try {
+      return DateTime.parse(raw);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  String get id => type == CustomerOrderItemType.product
+      ? (productOrder?.orderId?.toString() ?? '')
+      : (subscriptionOrder?.id ?? '');
+}
+
 class OrderState {
   final List<OrderModel> orders;
+  final List<SubscriptionModel> subscriptions;
   final bool isLoading;
   final String? errorMessage;
-  final String selectedFilter; // 'All', 'Processing', 'Shipped', 'Delivered', 'Cancelled'
+  final String typeFilter; // 'all', 'product', 'subscription'
+  final String selectedFilter; 
   final bool isPlacingOrder;
 
   OrderState({
     this.orders = const [],
+    this.subscriptions = const [],
     this.isLoading = false,
     this.errorMessage,
+    this.typeFilter = 'all',
     this.selectedFilter = 'All',
     this.isPlacingOrder = false,
   });
 
   OrderState copyWith({
     List<OrderModel>? orders,
+    List<SubscriptionModel>? subscriptions,
     bool? isLoading,
     String? errorMessage,
+    String? typeFilter,
     String? selectedFilter,
     bool? isPlacingOrder,
   }) {
     return OrderState(
       orders: orders ?? this.orders,
+      subscriptions: subscriptions ?? this.subscriptions,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
+      typeFilter: typeFilter ?? this.typeFilter,
       selectedFilter: selectedFilter ?? this.selectedFilter,
       isPlacingOrder: isPlacingOrder ?? this.isPlacingOrder,
     );
   }
 
-  List<OrderModel> get filteredOrders {
-    if (selectedFilter == 'All') return orders;
-    final f = selectedFilter.toLowerCase();
-    if (f == 'store pickup' || f == 'pickup') {
-      return orders.where((o) => o.isPickup || o.deliveryType == 'pickup').toList();
+  int get allOrdersCount => orders.length + subscriptions.length;
+  int get productOrdersCount => orders.length;
+  int get subscriptionOrdersCount => subscriptions.length;
+
+  List<CustomerOrderFeedItem> get filteredFeed {
+    List<CustomerOrderFeedItem> feed = [];
+
+    if (typeFilter == 'all') {
+      feed = [
+        ...orders.map(CustomerOrderFeedItem.product),
+        ...subscriptions.map(CustomerOrderFeedItem.subscription),
+      ];
+      feed.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
+    } else if (typeFilter == 'product') {
+      feed = orders.map(CustomerOrderFeedItem.product).toList();
+      feed.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
+    } else if (typeFilter == 'subscription') {
+      feed = subscriptions.map(CustomerOrderFeedItem.subscription).toList();
+      feed.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
     }
-    return orders.where((o) => o.orderStatus.toLowerCase() == f).toList();
+
+    if (selectedFilter == 'All' || selectedFilter == 'All Orders') {
+      return feed;
+    }
+
+    final f = selectedFilter.toLowerCase().replaceAll(' ', '_');
+    return feed.where((item) {
+      if (item.type == CustomerOrderItemType.product) {
+        final s = item.productOrder!.orderStatus.toLowerCase().replaceAll(' ', '_');
+        if (f == 'ready_for_pickup') return s == 'ready' || s == 'ready_for_pickup';
+        if (f == 'out_for_delivery') return s == 'out_for_delivery' || s == 'shipped';
+        return s == f;
+      } else {
+        final s = item.subscriptionOrder!.status.toLowerCase().replaceAll(' ', '_');
+        final p = item.subscriptionOrder!.paymentStatus.toLowerCase().replaceAll(' ', '_');
+        if (f == 'pending') return s == 'pending' || p == 'pending';
+        if (f == 'active') return s == 'active';
+        if (f == 'cancelled') return s == 'cancelled';
+        if (f == 'delivered') return s == 'active';
+        return s == f || p == f;
+      }
+    }).toList();
+  }
+
+  List<OrderModel> get filteredOrders {
+    final productOrders = orders.where((o) =>
+        o.deliveryType.toLowerCase() != 'subscription' &&
+        !o.id.toString().toUpperCase().startsWith('SUB-') &&
+        !(o.orderNumber?.toUpperCase().startsWith('SUB-') ?? false)).toList();
+
+    if (selectedFilter == 'All' || selectedFilter == 'All Orders') return productOrders;
+    final f = selectedFilter.toLowerCase().replaceAll(' ', '_');
+    return productOrders.where((o) {
+      final s = o.orderStatus.toLowerCase().replaceAll(' ', '_');
+      if (f == 'ready_for_pickup') {
+        return s == 'ready' || s == 'ready_for_pickup';
+      }
+      if (f == 'out_for_delivery') {
+        return s == 'out_for_delivery' || s == 'shipped';
+      }
+      return s == f;
+    }).toList();
   }
 }
 
@@ -50,29 +146,73 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   OrderNotifier(this.ref) : super(OrderState()) {
     fetchOrders();
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id || (previous?.user == null && next.user != null)) {
+        fetchOrders();
+      }
+    });
+  }
+
+  void resetState() {
+    state = OrderState();
   }
 
   Future<void> fetchOrders() async {
     final user = ref.read(authProvider).user;
-    final ident = user?.id?.toString() ?? user?.email ?? '1';
+    if (user == null) {
+      state = OrderState();
+      return;
+    }
+
+    String ident = '';
+    if (user.id != null && user.id.toString() != '0' && user.id.toString() != 'null' && user.id.toString().isNotEmpty) {
+      ident = user.id.toString();
+    } else if (user.email.isNotEmpty) {
+      ident = user.email;
+    } else if (user.phone != null && user.phone!.isNotEmpty) {
+      ident = user.phone!;
+    }
+
+    if (ident.isEmpty) {
+      state = OrderState();
+      return;
+    }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final api = ref.read(apiClientProvider);
-      final res = await api.get('${ApiEndpoints.userOrders}/$ident');
-      final data = res.data;
 
-      if (data['success'] == true && data['orders'] != null) {
-        final list = (data['orders'] as List)
-            .map((o) => OrderModel.fromJson(o as Map<String, dynamic>))
-            .toList();
-        state = state.copyWith(orders: list, isLoading: false);
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: data['message'] ?? 'Failed to load orders',
-        );
-      }
+      List<OrderModel> fetchedOrders = state.orders;
+      List<SubscriptionModel> fetchedSubs = state.subscriptions;
+
+      try {
+        final ordersRes = await api.get('${ApiEndpoints.userOrders}/$ident');
+        if (ordersRes.data != null && ordersRes.data['success'] == true && ordersRes.data['orders'] != null) {
+          fetchedOrders = (ordersRes.data['orders'] as List)
+              .map((o) => OrderModel.fromJson(o as Map<String, dynamic>))
+              .where((o) =>
+                  o.deliveryType.toLowerCase() != 'subscription' &&
+                  !o.id.toString().toUpperCase().startsWith('SUB-') &&
+                  !(o.orderNumber?.toUpperCase().startsWith('SUB-') ?? false))
+              .toList();
+        }
+      } catch (_) {}
+
+      try {
+        final subsRes = await api.get('${ApiEndpoints.userSubscriptions}/$ident');
+        if (subsRes.data != null && subsRes.data['success'] == true && subsRes.data['subscriptions'] != null) {
+          fetchedSubs = (subsRes.data['subscriptions'] as List)
+              .map((s) => SubscriptionModel.fromJson(s as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (_) {}
+
+      state = state.copyWith(
+        orders: fetchedOrders,
+        subscriptions: fetchedSubs,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -81,8 +221,89 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
+  void setTypeFilter(String type) {
+    state = state.copyWith(typeFilter: type);
+  }
+
   void setFilter(String filter) {
     state = state.copyWith(selectedFilter: filter);
+  }
+
+  Future<OrderModel?> fetchOrderDetails(String orderId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('${ApiEndpoints.orders}/$orderId');
+      if (res.data != null && res.data['success'] == true && res.data['order'] != null) {
+        final fresh = OrderModel.fromJson(res.data['order'] as Map<String, dynamic>);
+        final updated = state.orders.map((o) => (o.id.toString() == orderId || o.orderNumber == orderId) ? fresh : o).toList();
+        state = state.copyWith(orders: updated);
+        return fresh;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> rateOrder({
+    required String orderId,
+    required int rating,
+    String feedback = '',
+    List<String> tags = const [],
+  }) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.post(
+        '${ApiEndpoints.orders}/$orderId/rate',
+        data: {
+          'rating': rating,
+          'feedback': feedback,
+          'tags': tags,
+        },
+      );
+      if (res.data != null && res.data['success'] == true) {
+        final updatedOrders = state.orders.map((o) {
+          if (o.id.toString() == orderId.toString() || o.orderNumber == orderId) {
+            return o.copyWith(rating: rating.toDouble(), feedback: feedback);
+          }
+          return o;
+        }).toList();
+        state = state.copyWith(orders: updatedOrders);
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> reportOrderIssue({
+    required String orderId,
+    required String issueType,
+    String notes = '',
+  }) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.post(
+        '${ApiEndpoints.orders}/$orderId/issues',
+        data: {
+          'issue_type': issueType,
+          'notes': notes,
+        },
+      );
+      return res.data != null && res.data['success'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchDeliveryProofDetails(String orderId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('${ApiEndpoints.orders}/$orderId/delivery-details');
+      if (res.data != null && res.data['success'] == true) {
+        return Map<String, dynamic>.from(res.data['data'] ?? {});
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<OrderModel?> placeOrder(Map<String, dynamic> payload) async {
@@ -95,9 +316,10 @@ class OrderNotifier extends StateNotifier<OrderState> {
       if (data['success'] == true && data['order'] != null) {
         final newOrder = OrderModel.fromJson(data['order'] as Map<String, dynamic>);
         state = state.copyWith(
-          orders: [newOrder, ...state.orders],
+          orders: [newOrder, ...state.orders.where((o) => o.id != newOrder.id)],
           isPlacingOrder: false,
         );
+        fetchOrders();
         return newOrder;
       } else {
         state = state.copyWith(

@@ -9,6 +9,7 @@ import '../../core/constants/app_typography.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../widgets/thulirva_button.dart';
 import '../widgets/thulirva_text_field.dart';
@@ -23,6 +24,9 @@ class SubscribeModal extends ConsumerStatefulWidget {
 }
 
 class _SubscribeModalState extends ConsumerState<SubscribeModal> {
+  // Submission Guard to completely prevent double-click / duplicate subscriptions
+  bool _isSubmitting = false;
+
   int _currentStep = 1; // 1: Select Plan & Details, 2: UPI Payment & UTR
   SubscriptionPlanModel? _selectedPlan;
   int _quantity = 1;
@@ -45,7 +49,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
         final bytes = await picked.readAsBytes();
         final ext = picked.path.split('.').last.toLowerCase();
         final mimeType = ext == 'png' ? 'png' : 'jpeg';
-        final base64Str = 'data:image/' + mimeType + ';base64,' + base64Encode(bytes);
+        final base64Str = 'data:image/$mimeType;base64,${base64Encode(bytes)}';
 
         setState(() {
           _paymentProofFile = File(picked.path);
@@ -96,6 +100,8 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
   }
 
   Future<void> _handleConfirmSubscription() async {
+    if (_isSubmitting) return;
+
     if (_utrController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -106,56 +112,64 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
       return;
     }
 
-    final user = ref.read(authProvider).user;
-    final addressState = ref.read(addressProvider);
-    final selectedAddr = addressState.selectedAddress ??
-        (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
+    setState(() => _isSubmitting = true);
+    try {
+      final user = ref.read(authProvider).user;
+      final addressState = ref.read(addressProvider);
+      final selectedAddr = addressState.selectedAddress ??
+          (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
 
-    final plan = _selectedPlan!;
-    final totalPrice = plan.price * _quantity;
+      final plan = _selectedPlan!;
+      final totalPrice = plan.price * _quantity;
 
-    final payload = {
-      'user_id': user?.id,
-      'customer_name': selectedAddr?.name ?? user?.name ?? 'Valued Customer',
-      'customer_phone': selectedAddr?.phone ?? user?.phone ?? '9876543210',
-      'customer_email': user?.email ?? '',
-      'plan_id': plan.id,
-      'product_id': plan.productId,
-      'product_name': plan.productName,
-      'product_image': plan.productImage,
-      'time_period': plan.timePeriod,
-      'frequency': plan.frequency,
-      'quantity': _quantity,
-      'delivery_slot': _selectedSlot,
-      'price_per_delivery': 44,
-      'total_price': totalPrice,
-      'start_date': _startDate.toString().split(' ')[0],
-      'address': selectedAddr?.address ?? 'Doorstep Address, Chennai',
-      'city': selectedAddr?.city ?? 'Chennai',
-      'pincode': selectedAddr?.pincode ?? '600078',
-      'payment_method': 'UPI Direct Payment (7904880944@superyes)',
-      'transaction_id': _utrController.text.trim(),
-      'payment_proof': _paymentProofBase64,
-    };
+      final payload = {
+        'user_id': user?.id,
+        'customer_name': selectedAddr?.name ?? user?.name ?? 'Valued Customer',
+        'customer_phone': selectedAddr?.phone ?? user?.phone ?? '9876543210',
+        'customer_email': user?.email ?? '',
+        'plan_id': plan.id,
+        'product_id': plan.productId,
+        'product_name': plan.productName,
+        'product_image': plan.productImage,
+        'time_period': plan.timePeriod,
+        'frequency': plan.frequency,
+        'quantity': _quantity,
+        'delivery_slot': _selectedSlot,
+        'price_per_delivery': 44,
+        'total_price': totalPrice,
+        'start_date': _startDate.toString().split(' ')[0],
+        'address': selectedAddr?.address ?? 'Doorstep Address, Chennai',
+        'city': selectedAddr?.city ?? 'Chennai',
+        'pincode': selectedAddr?.pincode ?? '600078',
+        'payment_method': 'UPI Direct Payment (7904880944@superyes)',
+        'transaction_id': _utrController.text.trim(),
+        'payment_proof': _paymentProofBase64,
+      };
 
-    final ok = await ref.read(subscriptionProvider.notifier).createSubscription(payload);
+      final ok = await ref.read(subscriptionProvider.notifier).createSubscription(payload);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (ok) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Subscription activated! Fresh morning delivery scheduled.'),
-          backgroundColor: AppColors.forestGreen,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      final error = ref.read(subscriptionProvider).errorMessage ?? 'Subscription failed';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.cancelled),
-      );
+      if (ok) {
+        ref.read(orderProvider.notifier).fetchOrders();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Subscription activated! Fresh morning delivery scheduled.'),
+            backgroundColor: AppColors.forestGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        final error = ref.read(subscriptionProvider).errorMessage ?? 'Subscription failed';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppColors.cancelled),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -208,14 +222,16 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
               text: _currentStep == 1
                   ? 'Proceed to UPI Payment →'
                   : 'Confirm & Activate Subscription',
-              isLoading: subState.isSubmitting,
-              onPressed: () {
-                if (_currentStep == 1) {
-                  setState(() => _currentStep = 2);
-                } else {
-                  _handleConfirmSubscription();
-                }
-              },
+              isLoading: _isSubmitting || subState.isSubmitting,
+              onPressed: (_isSubmitting || subState.isSubmitting)
+                  ? null
+                  : () {
+                      if (_currentStep == 1) {
+                        setState(() => _currentStep = 2);
+                      } else {
+                        _handleConfirmSubscription();
+                      }
+                    },
             ),
           ),
         ],

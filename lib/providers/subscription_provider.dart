@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/api_endpoints.dart';
+import '../core/storage/storage_service.dart';
 import '../data/models/subscription_model.dart';
 import 'api_provider.dart';
 import 'auth_provider.dart';
@@ -43,8 +45,32 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   final Ref ref;
 
   SubscriptionNotifier(this.ref) : super(SubscriptionState()) {
+    _loadCachedSubscriptions();
     fetchPlans();
     fetchSubscriptions();
+
+    // Re-fetch subscriptions whenever user auth changes
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id || (previous?.user == null && next.user != null)) {
+        fetchSubscriptions();
+      }
+    });
+  }
+
+  void resetState() {
+    state = state.copyWith(subscriptions: [], isLoading: false, errorMessage: null);
+  }
+
+  void _loadCachedSubscriptions([String? userId]) {
+    try {
+      final cached = StorageService.getSubscriptions(userId: userId);
+      if (cached.isNotEmpty) {
+        final list = cached.map((json) => SubscriptionModel.fromJson(json)).toList();
+        state = state.copyWith(subscriptions: list);
+      } else {
+        state = state.copyWith(subscriptions: []);
+      }
+    } catch (_) {}
   }
 
   Future<void> fetchPlans() async {
@@ -155,9 +181,22 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
     state = state.copyWith(plans: fallback, isLoading: false);
   }
 
-  Future<void> fetchSubscriptions() async {
-    final user = ref.read(authProvider).user;
-    final ident = user?.id?.toString() ?? user?.phone ?? user?.email ?? '1';
+  Future<void> fetchSubscriptions({String? explicitIdent}) async {
+    final authUser = ref.read(authProvider).user;
+    final cachedUser = StorageService.getUser();
+
+    final currentUserId = authUser?.id?.toString() ?? cachedUser?['id']?.toString();
+    final ident = explicitIdent ??
+        currentUserId ??
+        authUser?.phone ??
+        cachedUser?['phone']?.toString() ??
+        authUser?.email ??
+        cachedUser?['email']?.toString();
+
+    if (ident == null || ident.isEmpty) {
+      state = state.copyWith(subscriptions: [], isLoading: false);
+      return;
+    }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
@@ -169,15 +208,31 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
         final list = (data['subscriptions'] as List)
             .map((s) => SubscriptionModel.fromJson(s as Map<String, dynamic>))
             .toList();
+
+        await StorageService.saveSubscriptions(
+          list.map((s) => s.toJson()).toList(),
+          userId: currentUserId,
+        );
         state = state.copyWith(subscriptions: list, isLoading: false);
         return;
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) {
+        print('[SUBSCRIPTION FETCH ERROR]: $e');
+      }
+    }
 
-    state = state.copyWith(subscriptions: [], isLoading: false);
+    _loadCachedSubscriptions(currentUserId);
+    state = state.copyWith(isLoading: false);
   }
 
   Future<bool> createSubscription(Map<String, dynamic> payload) async {
+    if (state.isSubmitting) {
+      if (kDebugMode) {
+        print('[SUBSCRIPTION PROVIDER]: Ignored duplicate submission - isSubmitting is already active');
+      }
+      return false;
+    }
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
       final api = ref.read(apiClientProvider);
@@ -186,10 +241,13 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
 
       if (data['success'] == true && data['subscription'] != null) {
         final newSub = SubscriptionModel.fromJson(data['subscription'] as Map<String, dynamic>);
+        final updatedList = [newSub, ...state.subscriptions.where((s) => s.id != newSub.id)];
+        await StorageService.saveSubscriptions(updatedList.map((s) => s.toJson()).toList());
         state = state.copyWith(
-          subscriptions: [newSub, ...state.subscriptions],
+          subscriptions: updatedList,
           isSubmitting: false,
         );
+        fetchSubscriptions();
         return true;
       }
       state = state.copyWith(isSubmitting: false, errorMessage: data['message'] ?? 'Failed to subscribe');
@@ -227,6 +285,7 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   }
   Future<bool> pauseSubscription(String subId) => updateStatus(subId, 'paused');
   Future<bool> resumeSubscription(String subId) => updateStatus(subId, 'active');
+  Future<bool> cancelSubscription(String subId) => updateStatus(subId, 'cancelled');
 }
 
 final subscriptionProvider = StateNotifierProvider<SubscriptionNotifier, SubscriptionState>((ref) {

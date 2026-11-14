@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
@@ -40,11 +41,24 @@ class CategoryBubble extends StatelessWidget {
                 ),
               ],
             ),
-            alignment: Alignment.center,
-            child: Text(
-              category.emoji ?? '🥛',
-              style: const TextStyle(fontSize: 26),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: (category.mobileImage != null && category.mobileImage!.isNotEmpty)
+                ? CachedNetworkImage(
+                    imageUrl: category.mobileImageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Center(
+                      child: Text(category.emoji ?? '🥛', style: const TextStyle(fontSize: 24)),
+                    ),
+                    errorWidget: (_, __, ___) => Center(
+                      child: Text(category.emoji ?? '🥛', style: const TextStyle(fontSize: 24)),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      category.emoji ?? '🥛',
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                  ),
           ),
           const SizedBox(height: 6),
           SizedBox(
@@ -66,4 +80,3 @@ class CategoryBubble extends StatelessWidget {
     );
   }
 }
-

@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/category_model.dart';
 import '../products/products_list_screen.dart';
@@ -222,10 +221,9 @@ class CategoryCard extends StatelessWidget {
   }
 
   Widget _buildPhoto(_CatMeta? meta) {
-    if (category.image != null && category.image!.isNotEmpty) {
-      final imgUrl = ApiEndpoints.resolveImageUrl(category.image!);
+    if (category.mobileImage != null && category.mobileImage!.isNotEmpty) {
       return CachedNetworkImage(
-        imageUrl: imgUrl,
+        imageUrl: category.mobileImageUrl,
         fit: BoxFit.cover,
         placeholder: (_, __) => Container(
           color: const Color(0xFFF3F7F2),

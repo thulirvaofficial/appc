@@ -80,7 +80,7 @@ class ProductState {
 class ProductNotifier extends StateNotifier<ProductState> {
   final Ref ref;
 
-  ProductNotifier(this.ref) : super(ProductState(isLoading: true)) {
+  ProductNotifier(this.ref) : super(ProductState(allProducts: const [], isLoading: true)) {
     fetchProducts();
   }
 
@@ -91,22 +91,24 @@ class ProductNotifier extends StateNotifier<ProductState> {
       final res = await api.get(ApiEndpoints.products);
       final data = res.data;
 
+      List<ProductModel> fetched = [];
       if (data is Map && data['success'] == true && data['products'] != null) {
-        final list = (data['products'] as List)
+        fetched = (data['products'] as List)
             .map((p) => ProductModel.fromJson(p as Map<String, dynamic>))
+            .where((p) => p.status.toLowerCase() == 'active')
             .toList();
-        state = state.copyWith(allProducts: list, isLoading: false);
       } else if (data is List) {
-        final list = data
+        fetched = data
             .map((p) => ProductModel.fromJson(p as Map<String, dynamic>))
+            .where((p) => p.status.toLowerCase() == 'active')
             .toList();
-        state = state.copyWith(allProducts: list, isLoading: false);
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'No products received',
-        );
       }
+
+      state = state.copyWith(
+        allProducts: fetched,
+        isLoading: false,
+        errorMessage: null,
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,

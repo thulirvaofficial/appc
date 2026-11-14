@@ -2,23 +2,29 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/notification_permission_service.dart';
+import '../../core/utils/id_formatter.dart';
+import '../../data/models/subscription_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/coupon_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../cart/cart_screen.dart';
 import '../notifications/notifications_screen.dart';
-import '../products/products_list_screen.dart';
 import '../products/product_details_screen.dart';
+import '../products/products_list_screen.dart';
+import '../location/location_picker_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
+import '../widgets/customer_search_bar.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/notification_permission_modal.dart';
-import '../../core/services/notification_permission_service.dart';
 import '../widgets/product_card.dart';
-import 'widgets/category_bubble.dart';
+import 'widgets/home_category_card.dart';
 import 'widgets/promo_banner.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -72,6 +78,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(categoryProvider.notifier).fetchCategories(),
       ref.read(notificationProvider.notifier).fetchNotifications(),
       ref.read(settingsProvider.notifier).fetchSettings(),
+      ref.read(subscriptionProvider.notifier).fetchSubscriptions(),
+      ref.read(couponProvider.notifier).fetchCoupons(),
     ]);
   }
 
@@ -84,19 +92,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final notifState = ref.watch(notificationProvider);
     final cartState = ref.watch(cartProvider);
     final settingsState = ref.watch(settingsProvider);
+    final subState = ref.watch(subscriptionProvider);
+    final couponState = ref.watch(couponProvider);
     final cartCount = cartState.totalItemCount;
 
-    final displayLocation = addressState.selectedAddress?.city != null
-        ? '${addressState.selectedAddress!.city}, Tamil Nadu'
-        : (user?.address != null && user!.address!.isNotEmpty)
-            ? user.address!
-            : 'Chennai, Tamil Nadu';
+    final selectedAddr = addressState.selectedAddress;
+    final isUnserviceable = selectedAddr != null && !selectedAddr.isServiceable;
 
-    final pincode = addressState.selectedAddress?.pincode ?? '600119';
+    final displayLocation = (selectedAddr != null && selectedAddr.area.isNotEmpty)
+        ? '${selectedAddr.area}, ${selectedAddr.city}'
+        : selectedAddr?.city != null
+            ? '${selectedAddr!.city}, Tamil Nadu'
+            : (user?.address != null && user!.address!.isNotEmpty)
+                ? user.address!
+                : 'Chennai, Tamil Nadu';
+
+    final pincode = selectedAddr?.pincode.isNotEmpty == true ? selectedAddr!.pincode : '600000';
+    final allProducts = productState.allProducts;
     final products = productState.featuredProducts;
+    final activeSubs = subState.activeSubscriptions;
+    final coupons = couponState.coupons;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7EE),
+      backgroundColor: const Color(0xFFFAF8EF),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.forestGreen,
@@ -118,7 +136,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   child: Column(
                     children: [
-                      // Header Row: Menu, Location Dropdown, Notifications, Cart
+                      // Top Row: Menu Button, Thulirva Brand Logo & Title, Notifications Bell, Cart Icon
                       Row(
                         children: [
                           IconButton(
@@ -128,42 +146,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             constraints: const BoxConstraints(),
                           ),
                           const SizedBox(width: 12),
-                          const Icon(Icons.location_on, color: Color(0xFFE5C97A), size: 20),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        displayLocation,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13.5,
-                                          color: Colors.white,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                          // Thulirva Brand Logo (Crisp White & Gold on Forest Green)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'assets/images/thulirva_brand_logo_white.png',
+                              height: 36,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '🌿 THULIRVA',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 18,
+                                      letterSpacing: 1.2,
                                     ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 16),
-                                  ],
-                                ),
-                                Text(
-                                  'PIN: $pincode',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w500,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-
+                          const Spacer(),
                           // Notification Bell
                           IconButton(
                             icon: Badge(
@@ -182,7 +188,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               );
                             },
                           ),
-
                           // Cart Icon
                           IconButton(
                             icon: Badge(
@@ -195,87 +200,148 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               child: const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 22),
                             ),
                             onPressed: () {
-                              if (widget.onNavigateToTab != null) {
-                                widget.onNavigateToTab!(3); // Cart is index 3
-                              } else {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                                );
-                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const CartScreen()),
+                              );
                             },
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
 
-                      // Pill Search Bar with Live Suggestions
-                      Container(
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (val) {
-                            setState(() {
-                              _searchQuery = val.trim();
-                            });
-                          },
-                          onSubmitted: (query) {
-                            if (query.trim().isNotEmpty) {
-                              ref.read(productProvider.notifier).setSearchQuery(query.trim());
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProductsListScreen(initialSearchQuery: query.trim()),
+                      // Location & PIN Code Selector Bar (Opens Interactive Google Maps Picker)
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LocationPickerScreen()),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.location_on, color: Color(0xFFE5C97A), size: 18),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '$displayLocation (PIN: $pincode)',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              );
-                            }
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Search fresh milk, paneer, ghee...',
-                            hintStyle: const TextStyle(
-                              color: Color(0xFF8A9A7A),
-                              fontSize: 13,
-                            ),
-                            prefixIcon: const Icon(Icons.search, color: Color(0xFF8A9A7A), size: 20),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 16),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                      });
-                                      ref.read(productProvider.notifier).setSearchQuery('');
-                                    },
-                                  )
-                                : const Icon(Icons.tune, color: Color(0xFF8A9A7A), size: 18),
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 16),
+                            ],
                           ),
                         ),
                       ),
+                      const SizedBox(height: 10),
 
-                      // Live Search Suggestions Overlay (Swiggy / Flipkart style)
+                      // Search Bar: Premium Pill Shape with Focus Halo Animation
+                      CustomerSearchBar(
+                        controller: _searchController,
+                        hintText: 'Search fresh milk, paneer, ghee...',
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.trim();
+                          });
+                        },
+                        onClear: () {
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                          ref.read(productProvider.notifier).setSearchQuery('');
+                        },
+                        onFilterTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ProductsListScreen()),
+                          );
+                        },
+                        onSubmitted: (query) {
+                          if (query.trim().isNotEmpty) {
+                            ref.read(productProvider.notifier).setSearchQuery(query.trim());
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProductsListScreen(initialSearchQuery: query.trim()),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+
+                      // Live Search Suggestions Overlay (22px pill radius)
                       if (_searchQuery.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _buildLiveSearchSuggestions(products),
+                        _buildLiveSearchSuggestions(allProducts),
                       ],
                     ],
                   ),
                 ),
+
+                // Coming Soon / Unserviceable Area Banner
+                if (isUnserviceable)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFFCD34D)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Coming Soon to ${selectedAddr.area.isNotEmpty ? selectedAddr.area : 'Your Area'}',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Doorstep delivery is not yet available here. You are in browsing mode.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LocationPickerScreen()),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Change',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 const SizedBox(height: 14),
 
                 // 2. Body Content
@@ -321,7 +387,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ],
 
-                      // Promo Hero Banner
+                      // Promotional Hero Banner (Auto-sliding)
                       PromoBanner(
                         onShopNow: () {
                           widget.onNavigateToTab?.call(1);
@@ -329,31 +395,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // 4-Feature Chips Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildFeatureItem(Icons.schedule, 'Daily\nDelivery'),
-                          _buildFeatureItem(
-                            Icons.calendar_month,
-                            'Flexible\nSubscription',
-                            onTap: () {
-                              if (widget.onNavigateToTab != null) {
-                                widget.onNavigateToTab!(2);
-                              } else {
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()));
-                              }
-                            },
-                          ),
-                          _buildFeatureItem(Icons.verified_outlined, 'Quality\nAssured'),
-                          _buildFeatureItem(Icons.nature_outlined, 'Farm\nto Home'),
-                        ],
-                      ),
-
-                      // Pickup Only Notice (if active)
+                      // Store Pickup Mode Alert (if active)
                       if (settingsState.isPickupOnly) ...[
-                        const SizedBox(height: 14),
                         Container(
+                          margin: const EdgeInsets.only(bottom: 14),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEDF7EB),
@@ -384,14 +429,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 18),
 
-                      // Categories Section (Grid)
+                      // 3. Shop by Category (Placed IMMEDIATELY below Promotional Banner)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Categories',
+                            'Shop by Category',
                             style: TextStyle(
                               color: AppColors.forestGreen,
                               fontWeight: FontWeight.w800,
@@ -416,7 +460,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       if (categoryState.isLoading && categoryState.categories.isEmpty)
                         const SizedBox(
-                          height: 80,
+                          height: 104,
                           child: Center(
                             child: SizedBox(
                               width: 24,
@@ -436,118 +480,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         )
                       else
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: categoryState.categories.length > 8 ? 8 : categoryState.categories.length,
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 8,
-                            childAspectRatio: 0.76,
-                          ),
-                          itemBuilder: (context, index) {
-                            final cat = categoryState.categories[index];
-                            return CategoryBubble(
-                              category: cat,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProductsListScreen(categoryName: cat.name),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      const SizedBox(height: 18),
-
-                      // Subscription Promo Card
-                      GestureDetector(
-                        onTap: () {
-                          if (widget.onNavigateToTab != null) {
-                            widget.onNavigateToTab!(2);
-                          } else {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()));
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF1B4332), Color(0xFF2D6B45)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.forestGreen.withValues(alpha: 0.15),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.calendar_month, color: Color(0xFFE5C97A), size: 24),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    Text(
-                                      'Daily Milk Subscription',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'Fresh milk delivered daily to your doorstep',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE5A93C),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Text(
-                                  'Subscribe →',
-                                  style: TextStyle(
-                                    color: AppColors.forestGreen,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        SizedBox(
+                          height: 104,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: categoryState.categories.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 10),
+                            itemBuilder: (context, index) {
+                              final cat = categoryState.categories[index];
+                              return HomeCategoryCard(category: cat);
+                            },
                           ),
                         ),
-                      ),
                       const SizedBox(height: 20),
 
-                      // Featured Products Section
+                      // 4. Dynamic Active Subscription Summary
+                      if (activeSubs.isNotEmpty)
+                        _buildActiveSubscriptionCard(activeSubs.first)
+                      else
+                        _buildNoSubscriptionPrompt(),
+
+                      const SizedBox(height: 20),
+
+                      // 5. Offers for You Section (from backend coupons)
+                      if (coupons.isNotEmpty) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: const [
+                            Text(
+                              'Offers for You',
+                              style: TextStyle(
+                                color: AppColors.forestGreen,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 120,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: coupons.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              return _buildCouponCard(coupons[index]);
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // 6. Featured Products Section
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -584,6 +570,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(
                           height: 120,
                           child: Center(child: LoadingIndicator(message: 'Loading farm products...')),
+                        )
+                      else if (productState.errorMessage != null && products.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24.0),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.cloud_off_rounded, size: 40, color: Color(0xFF6E8072)),
+                                const SizedBox(height: 8),
+                                Text(
+                                  productState.errorMessage!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Color(0xFF6E8072), fontSize: 13),
+                                ),
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: () => ref.read(productProvider.notifier).fetchProducts(),
+                                  icon: const Icon(Icons.refresh, size: 16),
+                                  label: const Text('Retry'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.forestGreen,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         )
                       else if (products.isEmpty)
                         const Padding(
@@ -622,36 +637,192 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildFeatureItem(IconData icon, String text, {VoidCallback? onTap}) {
+  // Active Subscription Summary Card
+  Widget _buildActiveSubscriptionCard(SubscriptionModel sub) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF2D6B45), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.forestGreen.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEDF7EB),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.repeat, color: AppColors.forestGreen, size: 18),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'ACTIVE SUBSCRIPTION',
+                style: TextStyle(
+                  color: AppColors.forestGreen,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'ACTIVE',
+                  style: TextStyle(
+                    color: AppColors.forestGreen,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            sub.productName,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.forestGreen,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Daily Quantity: ${sub.quantity} unit(s) • ${sub.deliverySlot}',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF4A5D4E), fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, size: 13, color: Color(0xFFE5A93C)),
+              const SizedBox(width: 4),
+              Text(
+                'Next Delivery: ${sub.nextRenewalDate ?? 'Tomorrow 6:00 AM'} • ${sub.daysRemaining > 0 ? '${sub.daysRemaining} days left' : 'Active'}',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E8072), fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: OutlinedButton(
+              onPressed: () {
+                if (widget.onNavigateToTab != null) {
+                  widget.onNavigateToTab!(2);
+                } else {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()));
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.forestGreen, width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text(
+                'View Subscription Details →',
+                style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Milk Subscription Prompt (when customer has no active subscription)
+  Widget _buildNoSubscriptionPrompt() {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        if (widget.onNavigateToTab != null) {
+          widget.onNavigateToTab!(2);
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SubscriptionsScreen()));
+        }
+      },
       child: Container(
-        width: 78,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5EDE2)),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF174B36), Color(0xFF204D3C)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: AppColors.forestGreen.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Column(
+        child: Row(
           children: [
-            Icon(icon, color: AppColors.forestGreen, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              text,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF3B5B44),
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                height: 1.15,
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(Icons.calendar_month, color: Color(0xFFE5C97A), size: 24),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Daily Milk Subscription',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Fresh milk delivered daily to your doorstep',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5A93C),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                'Subscribe →',
+                style: TextStyle(
+                  color: AppColors.forestGreen,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -660,12 +831,104 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  // Live Search Suggestions Overlay (Swiggy / Flipkart style)
+  // Offer / Coupon Card
+  Widget _buildCouponCard(dynamic coupon) {
+    final code = coupon.code?.toString() ?? 'THULIRVA';
+    final badge = coupon.discountBadgeText?.toString() ?? 'OFFER';
+    final desc = coupon.description?.toString() ?? 'Special discount';
+    final expiry = coupon.expiryDate?.toString() ?? 'Limited time';
+
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5EDE2), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE9B43B),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  badge,
+                  style: const TextStyle(
+                    color: Color(0xFF174B36),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => IdFormatter.copyToClipboard(context, code, label: 'Coupon Code'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF7EB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.forestGreen, width: 0.8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        code,
+                        style: const TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.copy, size: 11, color: AppColors.forestGreen),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            desc,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF3B5B44),
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            'Valid till $expiry',
+            style: const TextStyle(fontSize: 10, color: Color(0xFF8A9A7A)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Live Search Suggestions Overlay (22px pill radius)
   Widget _buildLiveSearchSuggestions(List<dynamic> products) {
     final q = _searchQuery.toLowerCase();
     final matches = products.where((p) {
       final name = p.name.toString().toLowerCase();
-      final cat = (p.categoryName ?? '').toString().toLowerCase();
+      final cat = (p.categoryName ?? p.category ?? '').toString().toLowerCase();
       final desc = (p.description ?? '').toString().toLowerCase();
       return name.contains(q) || cat.contains(q) || desc.contains(q);
     }).toList();
@@ -673,12 +936,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDDEBDD), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -691,19 +955,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  const Icon(Icons.search_off, color: Colors.grey, size: 20),
+                  const Icon(Icons.search_off_rounded, color: Color(0xFF8A9A7A), size: 22),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'No products matching "$_searchQuery". Try "milk", "ghee", or "paneer".',
-                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF6E8072)),
+                      'No products matching "$_searchQuery". Try "milk", "ghee", "paneer", or "curd".',
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF6E8072), fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
               ),
             )
           else ...[
-            ...matches.take(4).map((p) {
+            ...matches.take(5).map((p) {
               return InkWell(
                 onTap: () {
                   _searchController.clear();
@@ -719,11 +983,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       // Thumbnail
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEDF7EB),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFFFAF7EE),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE5EDE2)),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: (p.fullImageUrl ?? '').toString().isNotEmpty
@@ -745,19 +1010,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 2),
                             Text(
-                              (p.weight ?? '').toString().isNotEmpty ? p.weight : 'Fresh produce',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF6E8072)),
+                              '${p.category} • ${(p.weight ?? "").toString().isNotEmpty ? p.weight : "Pure Farm"}',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF6E8072), fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
                       ),
                       Text(
                         '₹${p.price.toStringAsFixed(0)}',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.forestGreen),
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: AppColors.forestGreen),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                      const Icon(Icons.chevron_right, size: 18, color: Color(0xFF8A9A7A)),
                     ],
                   ),
                 ),
@@ -765,7 +1031,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             }),
             Container(
               width: double.infinity,
-              color: const Color(0xFFFAF7EE),
+              color: const Color(0xFFFAF8EF),
               child: InkWell(
                 onTap: () {
                   final query = _searchQuery;
@@ -780,7 +1046,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -789,7 +1055,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: AppColors.forestGreen),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward, size: 14, color: AppColors.forestGreen),
+                      const Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.forestGreen),
                     ],
                   ),
                 ),

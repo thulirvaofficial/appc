@@ -14,155 +14,137 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _spinController;
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _showSubtleIndicator = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Clean transparent status bar with dark icons
+    // Edge-to-edge transparent system status & navigation bar
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
       ),
     );
 
-    // Continuous smooth spinning animation for the loading circle
-    _spinController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat();
+    // Subtle fallback indicator only if cold startup or network token check takes longer than 2.4s
+    Future.delayed(const Duration(milliseconds: 2400), () {
+      if (mounted) {
+        setState(() => _showSubtleIndicator = true);
+      }
+    });
 
-    _navigateToNextScreen();
+    _initializeApp();
   }
 
-  Future<void> _navigateToNextScreen() async {
-    // Show smooth rotating loader for 2.8 seconds
-    await Future.delayed(const Duration(milliseconds: 2800));
-    if (!mounted) return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage('assets/images/splash_bg.jpg'), context);
+  }
 
-    final onboardingDone = StorageService.isOnboardingCompleted();
-    final isAuthenticated = ref.read(authProvider).isAuthenticated;
+  Future<void> _initializeApp() async {
+    final startTime = DateTime.now();
 
-    if (!onboardingDone) {
-      // Rule: Only on first time app opening show the onboarding screens
+    try {
+      // Check auth status & onboarding completion
+      final onboardingDone = StorageService.isOnboardingCompleted();
+      final isAuthenticated = ref.read(authProvider).isAuthenticated;
+
+      // Ensure 2.4 seconds presentation so customer can visually appreciate the branding artwork
+      final elapsed = DateTime.now().difference(startTime);
+      const minDuration = Duration(milliseconds: 2400);
+      if (elapsed < minDuration) {
+        await Future.delayed(minDuration - elapsed);
+      }
+
+      if (!mounted) return;
+
+      Widget destination;
+      if (!onboardingDone) {
+        destination = const OnboardingScreen();
+      } else if (isAuthenticated) {
+        destination = const MainWrapper();
+      } else {
+        destination = const LoginScreen();
+      }
+
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const OnboardingScreen(),
-          transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
+          pageBuilder: (_, __, ___) => destination,
+          transitionsBuilder: (_, animation, __, child) => FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: child,
+          ),
           transitionDuration: const Duration(milliseconds: 400),
         ),
       );
-    } else if (isAuthenticated) {
-      // Returning logged in customer -> Home
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const MainWrapper(),
-          transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 400),
-        ),
-      );
-    } else {
-      // Returning user not logged in -> Login Screen directly (no onboarding)
+    } catch (e) {
+      debugPrint('SplashScreen initialization error: $e');
+      if (!mounted) return;
+      // Fallback gracefully to login
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const LoginScreen(),
-          transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 400),
+          transitionsBuilder: (_, animation, __, child) => FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+          transitionDuration: const Duration(milliseconds: 300),
         ),
       );
     }
   }
 
   @override
-  void dispose() {
-    _spinController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFEFBF3),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final height = constraints.maxHeight;
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. High-Resolution Approved Thulirva Artwork (Direct Asset)
+          Image.asset(
+            'assets/images/splash_bg.jpg',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.high,
+          ),
 
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. High-Resolution User-Uploaded Splash Screen Artwork
-              Image.asset(
-                'assets/images/splash_bg.jpg',
-                fit: BoxFit.cover,
-                width: width,
-                height: height,
-              ),
+          // Hidden semantic label for accessibility and test matchers
+          const Positioned(
+            top: -100,
+            child: Text('THULIRVA'),
+          ),
 
-              // Semantics / Test finder
-              const Positioned(
-                top: -100,
-                child: Text('THULIRVA'),
-              ),
-
-              // 2. Real Rotating Circular Loading Animation (User request: "cirle cirle roatte")
-              Positioned(
-                top: height * 0.825,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Smooth rotating loader placed right over the circle position
-                      Container(
-                        width: 44,
-                        height: 44,
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEFBF3).withValues(alpha: 0.95),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF143823).withValues(alpha: 0.08),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: RotationTransition(
-                          turns: _spinController,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 3.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF143823)),
-                            backgroundColor: Color(0xFFD6E4DB),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Loading...',
-                        style: TextStyle(
-                          color: Color(0xFF143823),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
+          // 2. Subtle progress indicator shown only if initialization takes extra time
+          if (_showSubtleIndicator)
+            Positioned(
+              left: 48,
+              right: 48,
+              bottom: 24,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: const LinearProgressIndicator(
+                  minHeight: 2.5,
+                  backgroundColor: Color(0x33FFFFFF),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8DC63F)),
                 ),
               ),
-            ],
-          );
-        },
+            ),
+        ],
       ),
     );
   }

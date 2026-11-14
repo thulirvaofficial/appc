@@ -39,9 +39,21 @@ class AddressNotifier extends StateNotifier<AddressState> {
     fetchAddresses();
   }
 
+  void resetState() {
+    state = AddressState();
+  }
+
   Future<void> fetchAddresses() async {
     final user = ref.read(authProvider).user;
-    final userId = user?.id?.toString() ?? '1';
+    if (user == null) {
+      state = AddressState();
+      return;
+    }
+    final userId = user.id.toString();
+    if (userId.isEmpty) {
+      state = AddressState();
+      return;
+    }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {

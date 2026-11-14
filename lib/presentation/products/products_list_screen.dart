@@ -6,6 +6,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/product_provider.dart';
 import '../cart/cart_screen.dart';
+import '../widgets/customer_search_bar.dart';
 import '../widgets/empty_state_view.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/product_card.dart';
@@ -172,6 +173,25 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
       ),
       body: Column(
         children: [
+          // Dedicated Pill Search Bar
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+            child: CustomerSearchBar(
+              controller: _searchController,
+              hintText: 'Search in fresh dairy & agro products...',
+              onChanged: (val) {
+                ref.read(productProvider.notifier).setSearchQuery(val.trim());
+              },
+              onClear: () {
+                ref.read(productProvider.notifier).setSearchQuery('');
+              },
+              onSubmitted: (val) {
+                ref.read(productProvider.notifier).setSearchQuery(val.trim());
+              },
+            ),
+          ),
+
           // Filter Chips Row (Mockup Screen 6: All, Milk, Curd, Paneer, Butter)
           Container(
             color: Colors.white,

@@ -1,6 +1,6 @@
 class ApiEndpoints {
   // Live Production Backend URL (Ubuntu VPS with Admin Panel at /admin & API at /api)
-  static const String defaultLiveUrl = 'http://15.235.251.225/api';
+  static const String defaultLiveUrl = 'https://thulirva.com/api';
 
   static String _customBaseUrl = '';
   static void setBaseUrl(String url) => _customBaseUrl = url;
@@ -30,7 +30,11 @@ class ApiEndpoints {
   static const String register = '/auth/register';
   static const String forgotPassword = '/auth/forgot-password';
   static const String resetPassword = '/auth/reset-password';
+  static const String profile = '/auth/profile';
   static const String updateProfile = '/auth/profile';
+  static const String profilePhoto = '/auth/profile/photo';
+  static const String sendOtp = '/auth/send-otp';
+  static const String verifyOtp = '/auth/verify-otp';
 
   // Products
   static const String products = '/products';
@@ -60,6 +64,12 @@ class ApiEndpoints {
   static const String storeSettings = '/settings/store';
   static const String pickupLocations = '/pickup/locations';
   static const String deliveryLocations = '/locations';
+
+  // Serviceability & Dynamic Location Management
+  static const String checkServiceability = '/serviceability/check';
+  static const String activeServiceableAreas = '/serviceability/active';
+  static const String reverseGeocode = '/serviceability/reverse-geocode';
+  static const String locationAutocomplete = '/serviceability/autocomplete';
 
   // Notifications
   static const String userNotifications = '/notifications/user';

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand Greens (Mockup Reference: Deep Forest Green #143823)
-  static const Color forestGreen = Color(0xFF143823);
-  static const Color appBarGreen = Color(0xFF143823);
+  // Brand Colors (Official Reference)
+  static const Color forestGreen = Color(0xFF173F2D);
+  static const Color cream = Color(0xFFFFF9E9);
+  static const Color gold = Color(0xFFE6B943);
+  static const Color sage = Color(0xFFDDEBDD);
+  static const Color white = Color(0xFFFFFFFF);
+
+  static const Color appBarGreen = Color(0xFF173F2D);
   static const Color darkGreen = Color(0xFF0F3320);
   static const Color deepGreen = Color(0xFF0A2518);
   static const Color mediumGreen = Color(0xFF2D6B45);
@@ -12,15 +17,12 @@ class AppColors {
   static const Color paleGreen = Color(0xFFEAF2E4);
   static const Color softGreen = Color(0xFFC8DBBF);
 
-  // Creams / Backgrounds (Rule 3 & 44: First splash & App Light Cream / Ivory theme)
-  static const Color cream = Color(0xFFFDF8ED);
-  static const Color lightCream = Color(0xFFFEFBF3);
-  static const Color ivory = Color(0xFFFCF9EE);
-  static const Color white = Color(0xFFFFFFFF);
+  // Creams / Backgrounds
+  static const Color lightCream = Color(0xFFFFF9E9);
+  static const Color ivory = Color(0xFFFFF9E9);
 
   // Golds / Highlights
-  static const Color gold = Color(0xFFC8A84B);
-  static const Color lightGold = Color(0xFFE5C97A);
+  static const Color lightGold = Color(0xFFF7D97B);
   static const Color darkGold = Color(0xFF9A7A30);
   static const Color warmGold = Color(0xFFF0D97A);
 

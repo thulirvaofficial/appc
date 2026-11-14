@@ -6,12 +6,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import '../../firebase_options.dart';
 import '../constants/api_endpoints.dart';
 import '../network/api_client.dart';
 import '../storage/storage_service.dart';
+import 'notification_permission_service.dart';
 import '../../presentation/notifications/notifications_screen.dart';
 import '../../presentation/orders/my_orders_screen.dart';
+import '../../presentation/profile/offers_screen.dart';
 import '../../presentation/subscriptions/subscriptions_screen.dart';
 
 // Global Navigator Key for Notification Redirection
@@ -32,19 +36,70 @@ class FirebaseNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
-  static const String channelId = 'thulirva_channel';
-  static const String channelName = 'THULIRVA Farm Notifications';
-  static const String channelDesc = 'Real-time updates on orders, milk subscriptions, and farm releases';
+  static const String channelId = 'thulirva_general_channel';
+  static const String channelName = 'THULIRVA General Updates';
+  static const String channelDesc = 'Real-time updates, offers, and announcements from Thulirva';
 
   // Deduplication cache for message IDs
   static final Set<String> _processedMessageIds = <String>{};
 
-  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    channelId,
-    channelName,
-    description: channelDesc,
+  // Custom Raw Resource Notification Sound
+  static const soundResource = RawResourceAndroidNotificationSound('thulirva_notification');
+
+  static const int morningReminderNotificationId = 530;
+
+  // 5 Android Notification Channels (with sound & high importance)
+  static const AndroidNotificationChannel morningRemindersChannel = AndroidNotificationChannel(
+    'thulirva_morning_reminders_v2',
+    'THULIRVA Morning Reminders',
+    description: 'Daily morning milk delivery reminders at 5:30 AM',
     importance: Importance.max,
     playSound: true,
+    sound: soundResource,
+    enableVibration: true,
+    showBadge: true,
+  );
+
+  static const AndroidNotificationChannel ordersChannel = AndroidNotificationChannel(
+    'thulirva_orders_channel_v2',
+    'THULIRVA Orders',
+    description: 'Real-time updates on your dairy orders and deliveries',
+    importance: Importance.max,
+    playSound: true,
+    sound: soundResource,
+    enableVibration: true,
+    showBadge: true,
+  );
+
+  static const AndroidNotificationChannel subscriptionsChannel = AndroidNotificationChannel(
+    'thulirva_subscriptions_channel_v2',
+    'THULIRVA Subscriptions',
+    description: 'Milk subscription alerts, renewals & pause status',
+    importance: Importance.max,
+    playSound: true,
+    sound: soundResource,
+    enableVibration: true,
+    showBadge: true,
+  );
+
+  static const AndroidNotificationChannel paymentsChannel = AndroidNotificationChannel(
+    'thulirva_payments_channel_v2',
+    'THULIRVA Payments',
+    description: 'Payment confirmations, receipts, and refund alerts',
+    importance: Importance.max,
+    playSound: true,
+    sound: soundResource,
+    enableVibration: true,
+    showBadge: true,
+  );
+
+  static const AndroidNotificationChannel generalChannel = AndroidNotificationChannel(
+    'thulirva_general_channel_v2',
+    'THULIRVA Updates',
+    description: 'General farm updates, offers & daily notifications',
+    importance: Importance.max,
+    playSound: true,
+    sound: soundResource,
     enableVibration: true,
     showBadge: true,
   );
@@ -52,10 +107,14 @@ class FirebaseNotificationService {
   /// Initialize Firebase & Push Notification Listeners
   static Future<void> initialize() async {
     try {
-      // 1. Initialize Firebase Core
+      // 1. Initialize Firebase Core & Timezones
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      tz.initializeTimeZones();
+      try {
+        tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+      } catch (_) {}
 
       // 2. Set Background Handler
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -85,15 +144,20 @@ class FirebaseNotificationService {
         },
       );
 
-      // Create Android Notification Channel
+      // Create all Android Notification Channels
       final androidPlatform = _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlatform != null) {
-        await androidPlatform.createNotificationChannel(_channel);
+        await androidPlatform.createNotificationChannel(ordersChannel);
+        await androidPlatform.createNotificationChannel(subscriptionsChannel);
+        await androidPlatform.createNotificationChannel(paymentsChannel);
+        await androidPlatform.createNotificationChannel(generalChannel);
+        await androidPlatform.createNotificationChannel(morningRemindersChannel);
+        // Legacy fallback channel
         await androidPlatform.createNotificationChannel(
           const AndroidNotificationChannel(
-            'thulirva_admin_channel',
-            'THULIRVA Admin Alerts',
-            description: 'Administrative and operational alerts',
+            'thulirva_channel',
+            'THULIRVA Alerts',
+            description: 'Legacy notification alerts',
             importance: Importance.max,
             playSound: true,
             enableVibration: true,
@@ -136,6 +200,12 @@ class FirebaseNotificationService {
         Future.delayed(const Duration(milliseconds: 1200), () {
           _routeNotificationPayload(initialMessage.data);
         });
+      }
+
+      // 11. Schedule Morning Milk Reminder if enabled
+      final isMorningReminderOn = await NotificationPermissionService.isMorningReminderEnabled();
+      if (isMorningReminderOn) {
+        await scheduleDailyMorningReminder();
       }
 
       if (kDebugMode) {
@@ -264,13 +334,15 @@ class FirebaseNotificationService {
         body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            channelId,
-            channelName,
-            channelDescription: channelDesc,
+            'thulirva_general_channel_v2',
+            'THULIRVA Updates',
+            channelDescription: 'General farm updates, offers & daily notifications',
             importance: Importance.max,
-            priority: Priority.high,
+            priority: Priority.max,
             playSound: true,
+            sound: soundResource,
             enableVibration: true,
+            visibility: NotificationVisibility.public,
             icon: '@mipmap/ic_launcher',
           ),
           iOS: DarwinNotificationDetails(
@@ -284,8 +356,89 @@ class FirebaseNotificationService {
     } catch (_) {}
   }
 
+  /// Compute next occurrence of morning reminder
+  static tz.TZDateTime _nextInstanceOfMorningTime(int hour, int minute) {
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledDate =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+    return scheduledDate;
+  }
+
+  /// Schedule daily 5:30 AM morning milk delivery reminder with sound & vibration
+  static Future<void> scheduleDailyMorningReminder({int hour = 5, int minute = 30}) async {
+    try {
+      final scheduledTime = _nextInstanceOfMorningTime(hour, minute);
+      await _localNotifications.zonedSchedule(
+        morningReminderNotificationId,
+        'Thulirva – Morning Milk Reminder',
+        'Your fresh milk delivery is scheduled. Have a wonderful morning!',
+        scheduledTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'thulirva_morning_reminders_v2',
+            'THULIRVA Morning Reminders',
+            channelDescription: 'Daily morning milk delivery reminders at 5:30 AM',
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            sound: soundResource,
+            enableVibration: true,
+            visibility: NotificationVisibility.public,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: jsonEncode({
+          'type': 'subscription',
+          'title': 'Morning Milk Reminder',
+          'body': 'Your fresh milk delivery is scheduled. Have a wonderful morning!',
+        }),
+      );
+      if (kDebugMode) {
+        print('⏰ [REMINDER] Daily morning reminder active for $hour:${minute.toString().padLeft(2, '0')} (Next: $scheduledTime)');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ [REMINDER ERROR]: Failed to schedule morning reminder: $e');
+      }
+    }
+  }
+
+  /// Cancel daily morning reminder
+  static Future<void> cancelDailyMorningReminder() async {
+    try {
+      await _localNotifications.cancel(morningReminderNotificationId);
+      if (kDebugMode) {
+        print('🛑 [REMINDER] Daily morning reminder cancelled.');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ [REMINDER CANCEL ERROR]: $e');
+      }
+    }
+  }
+
   /// Handle Foreground Push Messages
-  static void _handleForegroundMessage(RemoteMessage message) {
+  static void _handleForegroundMessage(RemoteMessage message) async {
+    final isPushEnabled = await NotificationPermissionService.isPushNotificationsEnabled();
+    if (!isPushEnabled) {
+      if (kDebugMode) {
+        print('🔇 [FCM] Notification suppressed because Push Notifications toggle is OFF');
+      }
+      return;
+    }
+
     final msgId = message.messageId ?? '${message.sentTime?.millisecondsSinceEpoch}_${message.data.hashCode}';
     if (_processedMessageIds.contains(msgId)) return;
     _processedMessageIds.add(msgId);
@@ -294,6 +447,26 @@ class FirebaseNotificationService {
     final notification = message.notification;
     final title = notification?.title ?? message.data['title'] ?? 'THULIRVA Update';
     final body = notification?.body ?? message.data['body'] ?? message.data['message'] ?? '';
+    final type = (message.data['type'] ?? '').toString().toLowerCase();
+
+    // Map to specific high-importance channel with sound
+    String targetChannel = 'thulirva_general_channel_v2';
+    String targetChannelName = 'THULIRVA Updates';
+    String targetChannelDesc = 'General farm updates & notifications';
+
+    if (type.contains('order')) {
+      targetChannel = 'thulirva_orders_channel_v2';
+      targetChannelName = 'THULIRVA Orders';
+      targetChannelDesc = 'Real-time updates on your dairy orders';
+    } else if (type.contains('sub')) {
+      targetChannel = 'thulirva_subscriptions_channel_v2';
+      targetChannelName = 'THULIRVA Subscriptions';
+      targetChannelDesc = 'Milk subscription alerts & renewals';
+    } else if (type.contains('pay') || type.contains('receipt') || type.contains('refund')) {
+      targetChannel = 'thulirva_payments_channel_v2';
+      targetChannelName = 'THULIRVA Payments';
+      targetChannelDesc = 'Payment confirmations & receipts';
+    }
 
     // Show Heads-Up Notification via Local Notifications
     _localNotifications.show(
@@ -302,13 +475,15 @@ class FirebaseNotificationService {
       body,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          channelId,
-          channelName,
-          channelDescription: channelDesc,
+          targetChannel,
+          targetChannelName,
+          channelDescription: targetChannelDesc,
           importance: Importance.max,
-          priority: Priority.high,
+          priority: Priority.max,
           playSound: true,
+          sound: soundResource,
           enableVibration: true,
+          visibility: NotificationVisibility.public,
           icon: '@mipmap/ic_launcher',
         ),
         iOS: const DarwinNotificationDetails(
@@ -325,12 +500,21 @@ class FirebaseNotificationService {
   static void _routeNotificationPayload(Map<String, dynamic> data) {
     final type = (data['type'] ?? '').toString().toLowerCase();
 
-    if (type.contains('order')) {
-      _navigateToOrders();
+    if (type.contains('coupon') || type.contains('offer')) {
+      _navigateToOffers();
     } else if (type.contains('sub')) {
       _navigateToSubscriptions();
+    } else if (type.contains('order') || type.contains('pay') || type.contains('pickup')) {
+      _navigateToOrders();
     } else {
       _navigateToNotifications();
+    }
+  }
+
+  static void _navigateToOffers() {
+    final nav = rootNavigatorKey.currentState;
+    if (nav != null) {
+      nav.push(MaterialPageRoute(builder: (_) => const OffersScreen()));
     }
   }
 

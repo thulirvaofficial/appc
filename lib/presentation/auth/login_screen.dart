@@ -63,39 +63,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 1. Top Pastoral Farm Artwork Banner
-            Container(
-              width: double.infinity,
-              height: 250,
-              decoration: const BoxDecoration(
-                color: AppColors.forestGreen,
-              ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/images/login_hero.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
-                    ),
+            // 1. Official THULIRVA Artwork Banner (Smooth, Clean, Perfectly Proportioned)
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0x14174B36),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  // Bottom smooth curve
-                  Positioned(
-                    bottom: -1,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFAF7EE),
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(28),
-                          topRight: Radius.circular(28),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    clipBehavior: Clip.antiAliasWithSaveLayer,
+                    child: AspectRatio(
+                      aspectRatio: 1024.0 / 409.0, // Exact native banner aspect ratio
+                      child: Image.asset(
+                        'assets/images/thulirva_official_banner.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: AppColors.forestGreen,
+                          child: const Center(
+                            child: Text(
+                              '🌿 THULIRVA',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
 

@@ -69,8 +69,14 @@ class CartNotifier extends StateNotifier<CartState> {
     });
   }
 
-  void _loadCart() {
-    final saved = StorageService.getCart();
+  String? _getCurrentUserId() {
+    final user = StorageService.getUser();
+    return user?['id']?.toString();
+  }
+
+  void _loadCart({String? userId}) {
+    final effectiveUid = userId ?? _getCurrentUserId();
+    final saved = StorageService.getCart(userId: effectiveUid);
     if (saved.isNotEmpty) {
       try {
         final list = saved.map((e) {
@@ -78,12 +84,34 @@ class CartNotifier extends StateNotifier<CartState> {
           return CartItemModel.fromJson(map);
         }).toList();
         state = state.copyWith(items: list);
+        return;
       } catch (_) {}
     }
+    state = state.copyWith(items: []);
   }
 
   void _saveCart() {
-    StorageService.saveCart(state.items.map((i) => i.toJson()).toList());
+    final uid = _getCurrentUserId();
+    StorageService.saveCart(state.items.map((i) => i.toJson()).toList(), userId: uid);
+  }
+
+  void loadUserCart(String? userId) {
+    _loadCart(userId: userId);
+  }
+
+  void clearCart() {
+    final uid = _getCurrentUserId();
+    StorageService.deleteCart(userId: uid);
+    state = state.copyWith(
+      items: const [],
+      discountAmount: 0.0,
+      appliedCouponCode: null,
+      couponMessage: null,
+    );
+  }
+
+  void resetState() {
+    clearCart();
   }
 
   int getProductQuantity(dynamic productId) {
@@ -125,6 +153,7 @@ class CartNotifier extends StateNotifier<CartState> {
 
     state = state.copyWith(items: list);
     _saveCart();
+    _revalidateCouponSilently();
   }
 
   void updateQuantity(dynamic productId, int newQuantity, {String? variant}) {
@@ -148,6 +177,7 @@ class CartNotifier extends StateNotifier<CartState> {
       );
       state = state.copyWith(items: list);
       _saveCart();
+      _revalidateCouponSilently();
     }
   }
 
@@ -156,11 +186,35 @@ class CartNotifier extends StateNotifier<CartState> {
     final list = state.items.where((i) => !(i.product.id.toString() == targetId && i.selectedVariant == variant)).toList();
     state = state.copyWith(items: list);
     _saveCart();
+    _revalidateCouponSilently();
   }
 
-  void clearCart() {
-    state = state.copyWith(items: const [], discountAmount: 0.0, appliedCouponCode: null, couponMessage: null);
-    _saveCart();
+  void _revalidateCouponSilently() {
+    final code = state.appliedCouponCode;
+    if (code == null) return;
+    if (state.items.isEmpty) {
+      removeCoupon();
+      return;
+    }
+
+    ref.read(apiClientProvider).post(
+      ApiEndpoints.validateCoupon,
+      data: {
+        'code': code,
+        'total': state.subtotal,
+        'order_amount': state.subtotal,
+      },
+    ).then((res) {
+      final data = res.data;
+      if (data != null && data['success'] == true && data['valid'] == true) {
+        final discount = double.tryParse((data['discount'] ?? 0).toString()) ?? 0.0;
+        state = state.copyWith(discountAmount: discount);
+      } else {
+        removeCoupon();
+      }
+    }).catchError((_) {
+      if (state.subtotal <= 0) removeCoupon();
+    });
   }
 
   Future<bool> applyCoupon(String code) async {
@@ -177,7 +231,7 @@ class CartNotifier extends StateNotifier<CartState> {
           'total': state.subtotal,
           'order_amount': state.subtotal,
         },
-      );
+      ).timeout(const Duration(seconds: 10));
 
       final data = res.data;
       if (data['success'] == true && data['valid'] == true) {
@@ -199,22 +253,13 @@ class CartNotifier extends StateNotifier<CartState> {
         return false;
       }
     } catch (e) {
-      // Fallback promo
-      if (clean == 'FARM10') {
-        final disc = state.subtotal * 0.10;
-        state = state.copyWith(
-          discountAmount: disc,
-          appliedCouponCode: clean,
-          couponMessage: '10% Farm discount applied!',
-          isApplyingCoupon: false,
-        );
-        return true;
-      }
-
+      final errMsg = e.toString().contains('timed out')
+          ? 'Network timeout validating coupon. Please try again.'
+          : 'Unable to validate coupon with server. Please check connection.';
       state = state.copyWith(
         discountAmount: 0.0,
         appliedCouponCode: null,
-        couponMessage: e.toString(),
+        couponMessage: errMsg,
         isApplyingCoupon: false,
       );
       return false;

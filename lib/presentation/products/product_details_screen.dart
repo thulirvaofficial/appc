@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/services/cart_notification_service.dart';
 import '../../data/models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../cart/cart_screen.dart';
@@ -284,25 +285,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                                 quantity: _quantity,
                                 variantModel: _selectedVariant,
                               );
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('✓ ${p.name} added to cart!'),
-                              backgroundColor: AppColors.forestGreen,
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 2),
-                              action: SnackBarAction(
-                                label: 'VIEW CART',
-                                textColor: AppColors.lightGold,
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const CartScreen()),
-                                  );
-                                },
-                              ),
-                            ),
-                          );
+                          CartNotificationService.show(productName: p.name);
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(

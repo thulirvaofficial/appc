@@ -67,13 +67,26 @@ class SubscriptionModel {
   final double totalPrice;
   final String startDate;
   final String? expiryDate;
+  final String? nextRenewalDate;
   final int daysRemaining;
   final String address;
+  final String paymentStatus;
   final String status;
   final String? transactionId;
   final String? paymentProof;
+  final String? rejectionReason;
+  final String? notes;
+  final String? createdAt;
 
   double get totalAmount => totalPrice;
+  String get purchaseDate => createdAt ?? startDate;
+  DateTime? get createdDateTime => DateTime.tryParse(createdAt ?? startDate);
+  bool get isActive => status.toLowerCase() == 'active';
+  bool get isPaused => status.toLowerCase() == 'paused';
+  bool get isExpired => status.toLowerCase() == 'expired' || (daysRemaining <= 0 && status.toLowerCase() != 'cancelled' && status.toLowerCase() != 'paused');
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
+  bool get isRejected => status.toLowerCase() == 'rejected' || paymentStatus.toLowerCase() == 'rejected';
+  bool get isPendingApproval => status.toLowerCase().contains('pending') || paymentStatus.toLowerCase().contains('pending');
 
   SubscriptionModel({
     required this.id,
@@ -91,12 +104,73 @@ class SubscriptionModel {
     required this.totalPrice,
     required this.startDate,
     this.expiryDate,
+    this.nextRenewalDate,
     this.daysRemaining = 30,
     required this.address,
+    this.paymentStatus = 'Pending',
     this.status = 'Active',
     this.transactionId,
     this.paymentProof,
+    this.rejectionReason,
+    this.notes,
+    this.createdAt,
   });
+
+  SubscriptionModel copyWith({
+    String? id,
+    dynamic userId,
+    String? customerName,
+    String? customerPhone,
+    String? customerEmail,
+    String? productName,
+    String? productImage,
+    String? timePeriod,
+    String? frequency,
+    int? quantity,
+    String? deliverySlot,
+    double? pricePerDelivery,
+    double? totalPrice,
+    String? startDate,
+    String? expiryDate,
+    String? nextRenewalDate,
+    int? daysRemaining,
+    String? address,
+    String? paymentStatus,
+    String? status,
+    String? transactionId,
+    String? paymentProof,
+    String? rejectionReason,
+    String? notes,
+    String? createdAt,
+  }) {
+    return SubscriptionModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerEmail: customerEmail ?? this.customerEmail,
+      productName: productName ?? this.productName,
+      productImage: productImage ?? this.productImage,
+      timePeriod: timePeriod ?? this.timePeriod,
+      frequency: frequency ?? this.frequency,
+      quantity: quantity ?? this.quantity,
+      deliverySlot: deliverySlot ?? this.deliverySlot,
+      pricePerDelivery: pricePerDelivery ?? this.pricePerDelivery,
+      totalPrice: totalPrice ?? this.totalPrice,
+      startDate: startDate ?? this.startDate,
+      expiryDate: expiryDate ?? this.expiryDate,
+      nextRenewalDate: nextRenewalDate ?? this.nextRenewalDate,
+      daysRemaining: daysRemaining ?? this.daysRemaining,
+      address: address ?? this.address,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      status: status ?? this.status,
+      transactionId: transactionId ?? this.transactionId,
+      paymentProof: paymentProof ?? this.paymentProof,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) {
     final startStr = json['start_date'] ?? json['startDate'] ?? DateTime.now().toString().split(' ')[0];
@@ -107,8 +181,8 @@ class SubscriptionModel {
 
     final int duration = int.tryParse(json['duration_days']?.toString() ?? '') ?? (json['time_period']?.toString().contains('15') == true ? 15 : 30);
     DateTime? expiryDateObj;
-    if (json['expiry_date'] != null) {
-      expiryDateObj = DateTime.tryParse(json['expiry_date']);
+    if (json['expiry_date'] != null && json['expiry_date'].toString().isNotEmpty) {
+      expiryDateObj = DateTime.tryParse(json['expiry_date'].toString());
     } else if (startDateObj != null) {
       expiryDateObj = startDateObj.add(Duration(days: duration));
     }
@@ -120,6 +194,8 @@ class SubscriptionModel {
       final expiryOnly = DateTime(expiryDateObj.year, expiryDateObj.month, expiryDateObj.day);
       remaining = expiryOnly.difference(today).inDays;
     }
+
+    final expiryFormatted = expiryDateObj != null ? expiryDateObj.toString().split(' ')[0] : null;
 
     return SubscriptionModel(
       id: json['id']?.toString() ?? '',
@@ -136,12 +212,17 @@ class SubscriptionModel {
       pricePerDelivery: double.tryParse((json['price_per_delivery'] ?? 44).toString()) ?? 44.0,
       totalPrice: double.tryParse((json['total_price'] ?? json['totalPrice'] ?? 0).toString()) ?? 0.0,
       startDate: startStr,
-      expiryDate: expiryDateObj != null ? expiryDateObj.toString().split(' ')[0] : null,
+      expiryDate: expiryFormatted,
+      nextRenewalDate: json['next_renewal_date'] ?? json['nextRenewalDate'] ?? expiryFormatted,
       daysRemaining: remaining,
       address: json['address'] ?? '',
+      paymentStatus: json['payment_status'] ?? json['paymentStatus'] ?? 'Pending',
       status: json['status'] ?? 'Active',
       transactionId: json['transaction_id'] ?? json['transactionId'],
       paymentProof: json['payment_proof'] ?? json['paymentProof'],
+      rejectionReason: json['rejection_reason'] ?? json['rejectionReason'],
+      notes: json['notes'],
+      createdAt: json['created_at']?.toString() ?? json['createdAt']?.toString() ?? json['purchase_date']?.toString() ?? startStr,
     );
   }
 
@@ -162,10 +243,15 @@ class SubscriptionModel {
       'total_price': totalPrice,
       'start_date': startDate,
       'expiry_date': expiryDate,
+      'next_renewal_date': nextRenewalDate,
       'address': address,
+      'payment_status': paymentStatus,
       'status': status,
       'transaction_id': transactionId,
       'payment_proof': paymentProof,
+      'rejection_reason': rejectionReason,
+      'notes': notes,
+      'created_at': createdAt,
     };
   }
 }

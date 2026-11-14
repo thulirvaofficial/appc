@@ -14,7 +14,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../profile/addresses_screen.dart';
+import '../subscriptions/subscriptions_screen.dart';
 import '../widgets/thulirva_button.dart';
 import 'order_success_screen.dart';
 
@@ -26,6 +28,9 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  // Submission Guard to completely prevent double-click / duplicate orders
+  bool _isSubmitting = false;
+
   // Delivery Method: 'delivery' or 'pickup'
   String _deliveryMethod = 'delivery';
 
@@ -192,60 +197,82 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Select Delivery Address', style: AppTypography.titleLarge),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AddressesScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add New'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Select Delivery Address',
+                          style: AppTypography.titleLarge.copyWith(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AddressesScreen()),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.add, size: 16, color: AppColors.forestGreen),
+                        label: const Text('Add New', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.forestGreen)),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
+                  ...addresses.map((a) {
+                    final isSelected = ref.watch(addressProvider).selectedAddress?.id == a.id;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.paleGreen : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? AppColors.forestGreen : AppColors.border,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text('${a.address}, ${a.city} - ${a.pincode} • 📞 ${a.phone}'),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_circle, color: AppColors.forestGreen)
+                            : null,
+                        onTap: () {
+                          ref.read(addressProvider.notifier).selectAddress(a);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    );
+                  }),
                 ],
               ),
-              const SizedBox(height: 12),
-              ...addresses.map((a) {
-                final isSelected = ref.watch(addressProvider).selectedAddress?.id == a.id;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.paleGreen : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? AppColors.forestGreen : AppColors.border,
-                      width: isSelected ? 1.5 : 1,
-                    ),
-                  ),
-                  child: ListTile(
-                    title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('${a.address}, ${a.city} - ${a.pincode} • 📞 ${a.phone}'),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_circle, color: AppColors.forestGreen)
-                        : null,
-                    onTap: () {
-                      ref.read(addressProvider.notifier).selectAddress(a);
-                      Navigator.pop(context);
-                    },
-                  ),
-                );
-              }),
-            ],
+            ),
           ),
         );
       },
@@ -253,6 +280,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _handlePlaceOrder() async {
+    if (_isSubmitting) return;
+
     final cartState = ref.read(cartProvider);
     final user = ref.read(authProvider).user;
     final addressState = ref.read(addressProvider);
@@ -271,6 +300,43 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
       );
       return;
+    }
+
+    if (!isPickup && selectedAddr != null && !selectedAddr.isServiceable) {
+      // Live re-verify serviceability against central backend before blocking
+      bool liveVerified = false;
+      String? backendMessage;
+      try {
+        final api = ref.read(apiClientProvider);
+        final checkRes = await api.post(
+          ApiEndpoints.checkServiceability,
+          data: {
+            'latitude': selectedAddr.latitude,
+            'longitude': selectedAddr.longitude,
+            'pincode': selectedAddr.pincode,
+            'area_name': selectedAddr.area,
+            'address': selectedAddr.address,
+          },
+        );
+        if (checkRes.data != null && checkRes.data['serviceable'] == true) {
+          liveVerified = true;
+          ref.read(addressProvider.notifier).selectAddress(selectedAddr.copyWith(isServiceable: true));
+        } else {
+          backendMessage = checkRes.data?['message'];
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      if (!liveVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(backendMessage ?? 'Sorry! Thulirva is not available in ${selectedAddr.area.isNotEmpty ? selectedAddr.area : "your area"} yet. Please select an active delivery location or choose Store Pickup.'),
+            backgroundColor: AppColors.cancelled,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
     }
 
     final utrText = _utrController.text.trim();
@@ -294,15 +360,128 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final contactName = isPickup
+    setState(() => _isSubmitting = true);
+    try {
+      final contactName = isPickup
         ? (user?.name ?? 'Valued Customer')
         : (selectedAddr?.name ?? user?.name ?? 'Valued Customer');
     final contactPhone = isPickup
         ? (user?.phone ?? storeSettings.storePhone)
         : (selectedAddr?.phone ?? user?.phone ?? storeSettings.storePhone);
 
-    final deliveryFee = isPickup ? 0.0 : cartState.deliveryCharge;
-    final calculatedGrandTotal = cartState.subtotal - cartState.discountAmount + deliveryFee;
+    // SEPARATE SUBSCRIPTION ITEMS FROM NORMAL PRODUCT ITEMS
+    final subItems = cartState.items.where((i) =>
+        i.product.category.toLowerCase() == 'subscription' ||
+        i.product.id.toString().startsWith('SUB_') ||
+        i.product.name.toLowerCase().contains('(30 days plan)') ||
+        i.product.name.toLowerCase().contains('subscription plan')).toList();
+
+    final normalItems = cartState.items.where((i) =>
+        i.product.category.toLowerCase() != 'subscription' &&
+        !i.product.id.toString().startsWith('SUB_') &&
+        !i.product.name.toLowerCase().contains('(30 days plan)') &&
+        !i.product.name.toLowerCase().contains('subscription plan')).toList();
+
+    bool subscriptionSuccess = false;
+
+    // Handle Subscriptions via dedicated subscription records
+    if (subItems.isNotEmpty) {
+      for (final subIt in subItems) {
+        final planIdStr = subIt.product.id.toString().replaceFirst('SUB_', '');
+        final planId = int.tryParse(planIdStr);
+        final subPayload = {
+          'user_id': user?.id,
+          'customer_name': contactName,
+          'customer_phone': contactPhone,
+          'customer_email': user?.email ?? '',
+          'plan_id': planId,
+          'product_id': planId,
+          'product_name': subIt.product.name,
+          'product_image': subIt.product.fullImageUrl.isNotEmpty ? subIt.product.fullImageUrl : subIt.product.image,
+          'time_period': subIt.product.weight.isNotEmpty ? subIt.product.weight : 'Daily Morning (30 Days)',
+          'frequency': 'Daily',
+          'quantity': subIt.quantity,
+          'delivery_slot': isPickup ? _selectedPickupSlot : '6:00 AM - 7:00 AM',
+          'price_per_delivery': 44,
+          'total_price': subIt.totalPrice,
+          'start_date': DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
+          'address': isPickup ? (_selectedPickupLocation?['address'] ?? storeSettings.storeAddress) : selectedAddr!.address,
+          'city': isPickup ? (_selectedPickupLocation?['city'] ?? 'Kanchipuram') : selectedAddr!.city,
+          'pincode': isPickup ? (_selectedPickupLocation?['pincode'] ?? '631601') : selectedAddr!.pincode,
+          'latitude': !isPickup ? selectedAddr?.latitude : null,
+          'longitude': !isPickup ? selectedAddr?.longitude : null,
+          'landmark': !isPickup ? selectedAddr?.landmark : null,
+          'delivery_instructions': !isPickup ? selectedAddr?.deliveryInstructions : null,
+          'payment_method': 'UPI Direct Payment (7904880944@superyes)',
+          'transaction_id': utrText,
+          'payment_proof': _paymentProofBase64,
+          'payment_status': 'Verification Pending',
+          'status': 'Pending Approval',
+        };
+        final ok = await ref.read(subscriptionProvider.notifier).createSubscription(subPayload);
+        if (ok) subscriptionSuccess = true;
+      }
+      await ref.read(subscriptionProvider.notifier).fetchSubscriptions();
+    }
+
+    // If there were only subscription items in the cart:
+    if (normalItems.isEmpty) {
+      if (!mounted) return;
+      if (subscriptionSuccess) {
+        SystemSound.play(SystemSoundType.alert);
+        ref.read(cartProvider.notifier).clearCart();
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+            backgroundColor: Colors.white,
+            title: Row(
+              children: const [
+                Icon(Icons.check_circle, color: AppColors.forestGreen, size: 26),
+                SizedBox(width: 8),
+                Text('Subscription Placed!', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w800, fontSize: 18)),
+              ],
+            ),
+            content: const Text(
+              'Your milk subscription purchase has been submitted successfully.\n\nOur team is verifying your payment reference. Once verified, your doorstep morning deliveries will be active!',
+              style: TextStyle(fontSize: 13.5, color: Color(0xFF333333), height: 1.4),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SubscriptionsScreen(initialTabIndex: 1),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.forestGreen,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                ),
+                child: const Text('View My Subscriptions', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        final error = ref.read(subscriptionProvider).errorMessage ?? 'Subscription purchase failed';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppColors.cancelled),
+        );
+      }
+      return;
+    }
+
+    // Normal product order checkout
+    final normalSubtotal = normalItems.fold<double>(0.0, (sum, i) => sum + i.totalPrice);
+    final deliveryFee = isPickup ? 0.0 : (normalSubtotal >= 299 ? 0.0 : cartState.deliveryCharge);
+    final calculatedGrandTotal = normalSubtotal - cartState.discountAmount + deliveryFee;
 
     final payload = {
       'user_id': user?.id,
@@ -320,7 +499,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'city': isPickup ? (_selectedPickupLocation?['city'] ?? 'Kanchipuram') : selectedAddr!.city,
       'state': isPickup ? 'Tamil Nadu' : selectedAddr!.state,
       'pincode': isPickup ? (_selectedPickupLocation?['pincode'] ?? '631601') : selectedAddr!.pincode,
-      'items': cartState.items.map((i) => {
+      'latitude': !isPickup ? selectedAddr?.latitude : null,
+      'longitude': !isPickup ? selectedAddr?.longitude : null,
+      'landmark': !isPickup ? selectedAddr?.landmark : null,
+      'delivery_instructions': !isPickup ? selectedAddr?.deliveryInstructions : null,
+      'items': normalItems.map((i) => {
         'id': i.product.id,
         'name': i.product.name,
         'price': i.product.price,
@@ -328,7 +511,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         'weight': i.selectedVariant ?? i.product.weight,
         'total': i.totalPrice,
       }).toList(),
-      'subtotal': cartState.subtotal,
+      'subtotal': normalSubtotal,
       'delivery_charge': deliveryFee,
       'discount_amount': cartState.discountAmount,
       'promo_code': cartState.appliedCouponCode,
@@ -363,6 +546,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
       );
     }
+  } finally {
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+    }
+  }
   }
 
   @override
@@ -370,6 +558,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cartState = ref.watch(cartProvider);
     final addressState = ref.watch(addressProvider);
     final orderState = ref.watch(orderProvider);
+    final subState = ref.watch(subscriptionProvider);
     final storeSettings = ref.watch(settingsProvider);
     final isPickupOnlyAdmin = storeSettings.isPickupOnly;
     final isPickup = isPickupOnlyAdmin || _deliveryMethod == 'pickup';
@@ -784,20 +973,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: const [
-                                  Icon(Icons.location_on, color: AppColors.forestGreen, size: 20),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Delivery Address',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
-                                  ),
-                                ],
+                              Expanded(
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.location_on, color: AppColors.forestGreen, size: 20),
+                                    SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Delivery Address',
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               if (addressState.addresses.isNotEmpty)
                                 TextButton(
                                   onPressed: () => _showAddressSelectionModal(addressState.addresses),
-                                  style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2), visualDensity: VisualDensity.compact),
                                   child: const Text('Change', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.forestGreen)),
                                 )
                               else
@@ -808,6 +1004,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                       MaterialPageRoute(builder: (_) => const AddressesScreen()),
                                     );
                                   },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
                                   icon: const Icon(Icons.add, size: 16),
                                   label: const Text('Add Address'),
                                 ),
@@ -1231,8 +1431,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             child: SafeArea(
               child: ThulirvaButton(
                 text: 'Verify & Place Order • ₹${calculatedGrandTotal.toStringAsFixed(0)}',
-                isLoading: orderState.isPlacingOrder,
-                onPressed: _handlePlaceOrder,
+                isLoading: _isSubmitting || orderState.isPlacingOrder || subState.isSubmitting,
+                onPressed: (_isSubmitting || orderState.isPlacingOrder || subState.isSubmitting)
+                    ? null
+                    : _handlePlaceOrder,
               ),
             ),
           ),

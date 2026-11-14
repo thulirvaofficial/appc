@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/services/cart_notification_service.dart';
 import '../../data/models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/settings_provider.dart';
-import '../cart/cart_screen.dart';
 import '../products/product_details_screen.dart';
 
 class ProductCard extends ConsumerWidget {
@@ -166,28 +166,7 @@ class ProductCard extends ConsumerWidget {
                           : InkWell(
                               onTap: () {
                                 ref.read(cartProvider.notifier).addToCart(product);
-                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('✓ ${product.name} added to cart!'),
-                                    backgroundColor: AppColors.forestGreen,
-                                    duration: const Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
-                                    action: SnackBarAction(
-                                      label: 'VIEW CART',
-                                      textColor: AppColors.lightGold,
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (_) => const CartScreen()),
-                                        );
-                                      },
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                );
+                                CartNotificationService.show(productName: product.name, context: context);
                               },
                               borderRadius: BorderRadius.circular(showAddText ? 16 : 6),
                               child: showAddText

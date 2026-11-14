@@ -47,12 +47,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // Look for product text
-    print('Searching for widgets...');
     expect(find.text('test'), findsOneWidget);
     expect(find.text('My Cart (1)'), findsOneWidget);
     expect(find.text('Order Summary'), findsOneWidget);
     expect(find.text('Apply Coupon'), findsOneWidget);
     expect(find.textContaining('Proceed to Checkout'), findsOneWidget);
-    print('✓ All CartScreen widgets rendered perfectly!');
   });
 }

@@ -12,7 +12,6 @@ class StorageService {
   static const String _keyOnboarding = 'thulirva_onboarding_completed';
   static const String _keyToken = 'thulirva_jwt_token';
   static const String _keyUser = 'thulirva_cached_user';
-  static const String _keyCart = 'thulirva_mobile_cart';
   static const String _keyPushToken = 'thulirva_fcm_token';
   static const String _keyFirstWelcome = 'thulirva_first_welcome_sent';
 
@@ -72,11 +71,6 @@ class StorageService {
     await _prefs?.remove(_keyUser);
   }
 
-  static Future<void> clearAuthSession() async {
-    await deleteToken();
-    await deleteUser();
-  }
-
   // Push Token
   static Future<void> savePushToken(String token) async {
     await _prefs?.setString(_keyPushToken, token);
@@ -95,19 +89,87 @@ class StorageService {
     await _prefs?.setBool(_keyFirstWelcome, val);
   }
 
-  // Cart
-  static Future<void> saveCart(List<Map<String, dynamic>> cart) async {
-    await _prefs?.setString(_keyCart, jsonEncode(cart));
+  // Account Scoped Keys
+  static String _cartKey(String? userId) {
+    if (userId != null && userId.isNotEmpty) {
+      return 'thulirva_cart_$userId';
+    }
+    final cached = getUser();
+    final uid = cached?['id']?.toString();
+    if (uid != null && uid.isNotEmpty) {
+      return 'thulirva_cart_$uid';
+    }
+    return 'thulirva_guest_cart';
   }
 
-  static List<dynamic> getCart() {
-    final str = _prefs?.getString(_keyCart);
+  static String _subsKey(String? userId) {
+    if (userId != null && userId.isNotEmpty) {
+      return 'thulirva_subs_$userId';
+    }
+    final cached = getUser();
+    final uid = cached?['id']?.toString();
+    if (uid != null && uid.isNotEmpty) {
+      return 'thulirva_subs_$uid';
+    }
+    return 'thulirva_cached_subscriptions';
+  }
+
+  // Cart (Strict Customer Account Scoped)
+  static Future<void> saveCart(List<Map<String, dynamic>> cart, {String? userId}) async {
+    final key = _cartKey(userId);
+    await _prefs?.setString(key, jsonEncode(cart));
+  }
+
+  static List<dynamic> getCart({String? userId}) {
+    final key = _cartKey(userId);
+    final str = _prefs?.getString(key);
     if (str == null || str.isEmpty) return [];
     try {
       final decoded = jsonDecode(str);
       if (decoded is List) return decoded;
     } catch (_) {}
     return [];
+  }
+
+  static Future<void> deleteCart({String? userId}) async {
+    final key = _cartKey(userId);
+    await _prefs?.remove(key);
+    await _prefs?.remove('thulirva_mobile_cart');
+  }
+
+  // Subscriptions Cache (Account Scoped)
+  static Future<void> saveSubscriptions(List<Map<String, dynamic>> subs, {String? userId}) async {
+    final key = _subsKey(userId);
+    await _prefs?.setString(key, jsonEncode(subs));
+  }
+
+  static List<Map<String, dynamic>> getSubscriptions({String? userId}) {
+    final key = _subsKey(userId);
+    final str = _prefs?.getString(key);
+    if (str == null || str.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(str);
+      if (decoded is List) {
+        return decoded.whereType<Map<String, dynamic>>().toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<void> deleteSubscriptions({String? userId}) async {
+    final key = _subsKey(userId);
+    await _prefs?.remove(key);
+    await _prefs?.remove('thulirva_cached_subscriptions');
+  }
+
+  // Full Auth Session Cleanup
+  static Future<void> clearAuthSession({String? userId}) async {
+    await deleteToken();
+    await deleteUser();
+    await deleteCart(userId: userId);
+    await deleteSubscriptions(userId: userId);
+    await _prefs?.remove('thulirva_guest_cart');
+    await _prefs?.remove('thulirva_mobile_cart');
   }
 
   static Future<void> clearAll() async {

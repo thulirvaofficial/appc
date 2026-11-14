@@ -9,6 +9,12 @@ import 'presentation/splash/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Log all Flutter errors explicitly to console
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+    debugPrint('🚨 [FLUTTER ERROR]: ${details.exceptionAsString()}');
+  };
+
   // Initialize Local Storage Services (SharedPreferences & SecureStorage)
   await StorageService.init();
 

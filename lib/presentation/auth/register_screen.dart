@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../main_wrapper.dart';
 
@@ -23,6 +24,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscureConfirm = true;
 
   @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
@@ -34,6 +43,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final passError = AppValidators.validatePassword(_passwordController.text);
+    if (passError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(passError),
+          backgroundColor: AppColors.cancelled,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -50,7 +71,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           _nameController.text.trim(),
           _emailController.text.trim(),
           _passwordController.text,
-          phone: _phoneController.text.trim(),
+          phone: AppValidators.cleanPhone(_phoneController.text),
         );
 
     if (!mounted) return;
@@ -83,57 +104,81 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final passwordText = _passwordController.text;
+    final strength = AppValidators.getPasswordStrength(passwordText);
+    final missingReqs = AppValidators.getMissingPasswordRequirements(passwordText);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7EE),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 1. Top Pastoral Farm Artwork Banner
-            Container(
-              width: double.infinity,
-              height: 220,
-              decoration: const BoxDecoration(
-                color: AppColors.forestGreen,
-              ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/images/login_hero.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
-                    ),
-                  ),
-                  // Back button
-                  Positioned(
-                    top: 40,
-                    left: 16,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.black.withValues(alpha: 0.3),
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                        onPressed: () => Navigator.pop(context),
+            // 1. Official THULIRVA Artwork Banner (Smooth, Clean, Perfectly Proportioned)
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.arrow_back, color: AppColors.forestGreen, size: 20),
                       ),
                     ),
-                  ),
-                  // Smooth curve transition
-                  Positioned(
-                    bottom: -1,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFAF7EE),
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(28),
-                          topRight: Radius.circular(28),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0x14174B36),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                  child: AspectRatio(
+                    aspectRatio: 1024.0 / 409.0, // Exact native banner aspect ratio
+                    child: Image.asset(
+                      'assets/images/thulirva_official_banner.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.forestGreen,
+                        child: const Center(
+                          child: Text(
+                            '🌿 THULIRVA',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
 
@@ -156,7 +201,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Join Thulirva for fresh daily farm dairy & products',
+                      'Join Thulirva for fresh daily farm dairy & agro products',
                       style: TextStyle(
                         color: Color(0xFF6E8072),
                         fontSize: 13,
@@ -170,19 +215,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _nameController,
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Please enter your name' : null,
-                      decoration: _inputDecoration('Enter your full name', Icons.person_outline),
+                      validator: AppValidators.validateName,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: _inputDecoration('Enter your full name (min 2 chars)', Icons.person_outline),
                     ),
                     const SizedBox(height: 14),
 
-                    // Phone Number
-                    _buildInputLabel('Phone Number'),
+                    // Phone Number (Numeric keyboard, 10-digit Indian standard)
+                    _buildInputLabel('Mobile Number'),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Please enter your phone number' : null,
-                      decoration: _inputDecoration('Enter 10-digit phone number', Icons.phone_outlined),
+                      validator: AppValidators.validatePhone,
+                      decoration: _inputDecoration('10-digit mobile (e.g. 9876543210)', Icons.phone_outlined),
                     ),
                     const SizedBox(height: 14),
 
@@ -192,20 +238,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      validator: (val) => val == null || !val.contains('@') ? 'Please enter a valid email' : null,
+                      validator: AppValidators.validateEmail,
                       decoration: _inputDecoration('Enter your email address', Icons.alternate_email),
                     ),
                     const SizedBox(height: 14),
 
-                    // Password
+                    // Strong Normal Password (NOT 6-digit PIN)
                     _buildInputLabel('Password'),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
-                      validator: (val) => val == null || val.length < 6 ? 'Password must be at least 6 characters' : null,
+                      validator: AppValidators.validatePassword,
                       decoration: _inputDecoration(
-                        'Create password (min 6 chars)',
+                        'Strong password (min 8 chars)',
                         Icons.lock_outline,
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -217,6 +263,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                       ),
                     ),
+
+                    // Live Password Strength & Requirements Checklist
+                    if (passwordText.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: strength,
+                                minHeight: 5,
+                                backgroundColor: const Color(0xFFE5EDE2),
+                                color: strength < 0.4
+                                    ? Colors.red
+                                    : (strength < 0.7 ? Colors.orange : AppColors.forestGreen),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            strength < 0.4
+                                ? 'Weak'
+                                : (strength < 0.7 ? 'Moderate' : 'Strong'),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: strength < 0.4
+                                  ? Colors.red
+                                  : (strength < 0.7 ? Colors.orange : AppColors.forestGreen),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPasswordChecklist(passwordText, missingReqs),
+                    ],
                     const SizedBox(height: 14),
 
                     // Confirm Password
@@ -225,7 +308,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     TextFormField(
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
-                      validator: (val) => val == null || val.isEmpty ? 'Please confirm your password' : null,
+                      validator: (val) => AppValidators.validateConfirmPassword(val, _passwordController.text),
                       decoration: _inputDecoration(
                         'Re-enter your password',
                         Icons.lock_outline,
@@ -310,6 +393,52 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  Widget _buildPasswordChecklist(String pass, List<String> missing) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5EDE2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _checkItem('8+ characters', pass.length >= 8 && pass.length <= 64),
+          _checkItem('At least 1 uppercase letter (A-Z)', RegExp(r'[A-Z]').hasMatch(pass)),
+          _checkItem('At least 1 lowercase letter (a-z)', RegExp(r'[a-z]').hasMatch(pass)),
+          _checkItem('At least 1 number (0-9)', RegExp(r'[0-9]').hasMatch(pass)),
+          _checkItem('At least 1 special char (!@#\$%^&*)', RegExp(r'[!@#$%^&*()_+\-=\[\]{};\x27:"\\|,.<>\/?]').hasMatch(pass)),
+          _checkItem('No spaces', !RegExp(r'\s').hasMatch(pass)),
+        ],
+      ),
+    );
+  }
+
+  Widget _checkItem(String title, bool met) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle : Icons.circle_outlined,
+            size: 14,
+            color: met ? AppColors.forestGreen : Colors.grey,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: met ? FontWeight.w700 : FontWeight.w400,
+              color: met ? AppColors.forestGreen : const Color(0xFF6E8072),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInputLabel(String label) {
     return Text(
       label,
@@ -340,6 +469,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(color: AppColors.forestGreen, width: 1.8),
       ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 }

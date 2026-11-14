@@ -142,8 +142,16 @@ class AddressesScreen extends ConsumerWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(addr.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                                if (addr.isDefault)
+                                Expanded(
+                                  child: Text(
+                                    addr.name,
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (addr.isDefault) ...[
+                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
@@ -152,6 +160,7 @@ class AddressesScreen extends ConsumerWidget {
                                     ),
                                     child: const Text('DEFAULT', style: TextStyle(color: AppColors.forestGreen, fontSize: 10, fontWeight: FontWeight.w800)),
                                   ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 4),

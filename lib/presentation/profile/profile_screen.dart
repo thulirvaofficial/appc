@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/id_formatter.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/my_orders_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../widgets/thulirva_app_bar.dart';
-import '../widgets/thulirva_text_field.dart';
-import '../../core/services/notification_permission_service.dart';
+import '../widgets/app_settings_dialog.dart';
 import 'about_screen.dart';
 import 'addresses_screen.dart';
+import 'my_profile_screen.dart';
 import 'offers_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -18,103 +19,8 @@ class ProfileScreen extends ConsumerWidget {
 
   const ProfileScreen({super.key, this.onSelectTab});
 
-  void _showEditProfileDialog(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authProvider).user;
-    final nameCtrl = TextEditingController(text: user?.name ?? '');
-    final phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    final addrCtrl = TextEditingController(text: user?.address ?? '');
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.forestGreen)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ThulirvaTextField(controller: nameCtrl, label: 'Full Name'),
-            const SizedBox(height: 10),
-            ThulirvaTextField(controller: phoneCtrl, label: 'Phone Number', keyboardType: TextInputType.phone),
-            const SizedBox(height: 10),
-            ThulirvaTextField(controller: addrCtrl, label: 'Default Address'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6E8072))),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ref.read(authProvider.notifier).updateProfile(
-                    name: nameCtrl.text.trim(),
-                    phone: phoneCtrl.text.trim(),
-                    address: addrCtrl.text.trim(),
-                  );
-              if (context.mounted) Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.forestGreen,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return FutureBuilder<bool>(
-            future: NotificationPermissionService.isPermissionGranted(),
-            builder: (ctx, snap) {
-              final isGranted = snap.data ?? false;
-              return AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: const Text('App Settings', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.forestGreen)),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SwitchListTile(
-                      title: const Text('Push Notifications', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: Text(isGranted ? 'Alerts active • Tap to open system settings' : 'Alerts disabled • Tap to turn on', style: const TextStyle(fontSize: 12)),
-                      value: isGranted,
-                      activeThumbColor: AppColors.forestGreen,
-                      onChanged: (val) async {
-                        if (val) {
-                          await NotificationPermissionService.requestPermission();
-                        } else {
-                          await NotificationPermissionService.openSettings();
-                        }
-                        setDialogState(() {});
-                      },
-                    ),
-                    SwitchListTile(
-                      title: const Text('Early Morning Reminders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('5:30 AM milk dispatch alert', style: TextStyle(fontSize: 12)),
-                      value: true,
-                      activeThumbColor: AppColors.forestGreen,
-                      onChanged: (_) {},
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Done', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
-    );
+    AppSettingsDialog.show(context);
   }
 
   void _showHelpSupportDialog(BuildContext context) {
@@ -167,140 +73,176 @@ class ProfileScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 36),
           child: Column(
             children: [
-              // 1. Pastoral Farm Header Card (Clean Background without text)
-              Container(
-                width: double.infinity,
-                height: 130,
-                decoration: BoxDecoration(
-                  color: AppColors.forestGreen,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.forestGreen.withValues(alpha: 0.14),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  children: [
-                    // Clean Background (cows in pasture on right, green gradient on left)
-                    Positioned.fill(
-                      child: Image.asset(
-                        'assets/images/profile_clean_bg.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
+              // 1. Pastoral Farm Header Card (Clickable -> Opens My Profile Screen)
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MyProfileScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(22),
+                child: Container(
+                  width: double.infinity,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    color: AppColors.forestGreen,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.forestGreen.withValues(alpha: 0.14),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    children: [
+                      // Clean Background (cows in pasture on right, green gradient on left)
+                      Positioned.fill(
+                        child: Image.asset(
+                          'assets/images/profile_clean_bg.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(color: AppColors.forestGreen),
+                        ),
+                      ),
 
-                    // User Info Row (Rendered EXACTLY ONCE via Flutter Widgets)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          // User Avatar Circle
-                          Container(
-                            width: 58,
-                            height: 58,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.5),
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                initial,
-                                style: const TextStyle(
-                                  color: AppColors.forestGreen,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                      // User Info Row (Rendered EXACTLY ONCE via Flutter Widgets)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            // User Avatar Circle
+                            Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 6,
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-
-                          // Name, Email, and Customer Badge
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  user?.name ?? 'Valued Customer',
+                              child: Center(
+                                child: Text(
+                                  initial,
                                   style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16.5,
+                                    color: AppColors.forestGreen,
+                                    fontSize: 24,
                                     fontWeight: FontWeight.w800,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  user?.email ?? 'customer@thulirva.com',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 11.5,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+
+                            // Name, Email, and Customer Badge
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    user?.name ?? 'Valued Customer',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDCEFD7),
-                                    borderRadius: BorderRadius.circular(12),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user?.email ?? 'customer@thulirva.com',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  child: const Text(
-                                    '👤 Customer',
-                                    style: TextStyle(
-                                      color: AppColors.forestGreen,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
+                                  const SizedBox(height: 6),
+                                  InkWell(
+                                    onTap: () => IdFormatter.copyToClipboard(context, IdFormatter.formatCustomerId(user?.id), label: 'Customer ID'),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCEFD7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            IdFormatter.formatCustomerId(user?.id),
+                                            style: const TextStyle(
+                                              color: AppColors.forestGreen,
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.copy, size: 10, color: AppColors.forestGreen),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Edit Profile Pencil Icon
-                          IconButton(
-                            icon: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                shape: BoxShape.circle,
+                                ],
                               ),
-                              child: const Icon(Icons.edit, color: Colors.white, size: 16),
                             ),
-                            onPressed: () => _showEditProfileDialog(context, ref),
-                          ),
-                        ],
+
+                            // Edit Profile Pencil Icon
+                            IconButton(
+                              icon: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const MyProfileScreen()),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
 
               // 2. Profile Menu Options
               _buildMenuItem(
+                icon: Icons.person_outline,
+                title: 'My Profile',
+                subtitle: 'Personal details, address & photo',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MyProfileScreen()),
+                  );
+                },
+              ),
+              _buildMenuItem(
                 icon: Icons.receipt_long_outlined,
                 title: 'My Orders',
                 subtitle: 'Track and manage orders',
                 onTap: () {
                   if (onSelectTab != null) {
-                    onSelectTab!(4); // Orders is tab 4
+                    onSelectTab!(3); // Orders is tab 3
                   } else {
                     Navigator.push(
                       context,
@@ -448,60 +390,67 @@ class ProfileScreen extends ConsumerWidget {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5EDE2), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE5EDE2), width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF2F7F0),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppColors.forestGreen, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppColors.forestGreen,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF2F7F0),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF6E8072),
-                      fontSize: 11.5,
-                    ),
+                  child: Icon(icon, color: AppColors.forestGreen, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF6E8072),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const Icon(Icons.chevron_right, color: Color(0xFFA5B8AA), size: 20),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: Color(0xFFA5B8AA), size: 20),
-          ],
+          ),
         ),
       ),
     );

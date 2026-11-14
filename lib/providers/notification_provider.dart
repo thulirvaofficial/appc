@@ -38,9 +38,21 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
     fetchNotifications();
   }
 
+  void resetState() {
+    state = NotificationState();
+  }
+
   Future<void> fetchNotifications() async {
     final user = ref.read(authProvider).user;
-    final ident = user?.id?.toString() ?? '1';
+    if (user == null) {
+      state = NotificationState();
+      return;
+    }
+    final ident = user.id.toString();
+    if (ident.isEmpty) {
+      state = NotificationState();
+      return;
+    }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
