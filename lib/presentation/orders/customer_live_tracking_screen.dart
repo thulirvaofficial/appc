@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -47,13 +48,41 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     _order = widget.initialOrder;
     _loadCustomMarkers();
     _startLiveTelemetrySync();
+    // Allow both portrait and landscape viewing for 3D live delivery tracking
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   @override
   void dispose() {
     _telemetryTimer?.cancel();
     _mapController?.dispose();
+    // Reset orientation preferences when leaving tracking screen
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
+  }
+
+  void _toggleOrientation() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeRight,
+        DeviceOrientation.landscapeLeft,
+      ]);
+    }
   }
 
   Future<void> _loadCustomMarkers() async {
@@ -198,11 +227,13 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   @override
   Widget build(BuildContext context) {
     final partner = _order;
-    final partnerName = partner.partnerName ?? 'Vigneshwaran M';
+    final partnerName = (partner.partnerName != null && partner.partnerName!.trim().isNotEmpty)
+        ? partner.partnerName!
+        : 'Kumar R';
     final partnerPhone = partner.partnerPhone ?? '9840515293';
     final partnerVehicle = partner.partnerVehicle ?? 'Electric Scooter • TN 09 CY 4567';
-    final partnerPhoto = partner.partnerPhoto ?? '/uploads/partners/vignesh_profile.png';
-    final rating = partner.partnerRating ?? 4.9;
+    final partnerPhoto = partner.partnerPhoto ?? '/uploads/partners/kumar_profile.png';
+    final rating = partner.partnerRating ?? 4.8;
 
     final riderPos = _resolvedRiderPos;
     final customerPos = _resolvedCustomerPos;
@@ -415,6 +446,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   }
 
   Widget _buildTopRightActions() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -422,6 +455,12 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
           icon: Icons.search_rounded,
           tooltip: 'Search',
           onTap: () {},
+        ),
+        const SizedBox(width: 8),
+        _buildCircularTopBtn(
+          icon: isLandscape ? Icons.stay_current_portrait_rounded : Icons.screen_rotation_rounded,
+          tooltip: isLandscape ? 'Switch to Portrait' : 'Rotate to Fullscreen Landscape (Reference View)',
+          onTap: _toggleOrientation,
         ),
         const SizedBox(width: 8),
         _buildCircularTopBtn(
