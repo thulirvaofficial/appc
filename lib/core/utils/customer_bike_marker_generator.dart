@@ -199,3 +199,4 @@ class CustomerBikeMarkerGenerator {
     return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
 }
+

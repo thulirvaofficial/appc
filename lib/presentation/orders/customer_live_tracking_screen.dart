@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/api_endpoints.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/utils/customer_bike_marker_generator.dart';
 import '../../data/models/order_model.dart';
 import '../../providers/order_provider.dart';
+import 'widgets/thulirva_3d_isometric_city_view.dart';
 
 class CustomerLiveTrackingScreen extends ConsumerStatefulWidget {
   final OrderModel initialOrder;
@@ -31,7 +31,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   double _currentHeading = 45.0;
   double _currentTilt = 55.0;
   bool _is3dView = true;
-  bool _trafficEnabled = false;
+  final bool _trafficEnabled = false;
+  bool _showIsometricCity = true;
 
   // Custom Markers Cache
   BitmapDescriptor? _riderMarker;
@@ -256,48 +257,81 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       ),
     };
 
+    final customerArea = (_order.city.isNotEmpty
+            ? _order.city
+            : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Thiruverkadu'))
+        .trim();
+
+    double routeProgress = 0.55;
+    if (_currentStageIndex == 0) {
+      routeProgress = 0.08;
+    } else if (_currentStageIndex == 1) {
+      routeProgress = 0.25;
+    } else if (_currentStageIndex == 2) {
+      routeProgress = 0.62;
+    } else if (_currentStageIndex >= 3) {
+      routeProgress = 0.95;
+    }
+
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: const Color(0xFFF1F5F9),
       body: Stack(
         children: [
-          // 1. Full 3D Isometric Map
-          Positioned.fill(
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: riderPos,
-                zoom: 17.0,
-                tilt: _currentTilt,
-                bearing: _currentHeading,
+          // 1. Primary View: 3D Isometric City Scene (Matching User's Attached Master Reference)
+          if (_showIsometricCity)
+            Positioned.fill(
+              child: Thulirva3DIsometricCityView(
+                progress: routeProgress,
+                hubName: 'Thulirva Dairy Hub',
+                customerArea: customerArea,
+                onRecenter: _recenterOnRider,
               ),
-              markers: markers,
-              polylines: polylines,
-              trafficEnabled: _trafficEnabled,
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: true,
-              buildingsEnabled: true,
-              onMapCreated: (ctrl) {
-                _mapController = ctrl;
-                _recenterOnRider();
-              },
+            )
+          else
+            // Fallback: 3D Tilted Google Map with Extruded Buildings
+            Positioned.fill(
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: riderPos,
+                  zoom: 17.0,
+                  tilt: _currentTilt,
+                  bearing: _currentHeading,
+                ),
+                markers: markers,
+                polylines: polylines,
+                trafficEnabled: _trafficEnabled,
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                compassEnabled: true,
+                buildingsEnabled: true,
+                onMapCreated: (ctrl) {
+                  _mapController = ctrl;
+                  _recenterOnRider();
+                },
+              ),
             ),
-          ),
 
-          // 2. Top Floating Header with Logo & Back Button
+          // 2. Floating Top-Left Header: Back Button + Thulirva Leaf & Title + Subtitle
           Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
+            top: MediaQuery.of(context).padding.top + 10,
             left: 16,
-            right: 16,
             child: _buildTopFloatingHeader(),
           ),
 
-          // 3. Floating Delivery Partner Information Card
+          // 3. Floating Top-Right Action Buttons: Search, Recenter/Settings, Layers Toggle
           Positioned(
-            top: MediaQuery.of(context).padding.top + 76,
-            left: 16,
+            top: MediaQuery.of(context).padding.top + 10,
             right: 16,
+            child: _buildTopRightActions(),
+          ),
+
+          // 4. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 72,
+            left: 16,
+            width: 260,
             child: _buildPartnerInfoCard(
               partnerName: partnerName,
               partnerPhone: partnerPhone,
@@ -309,40 +343,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ),
           ),
 
-          // 4. Floating Map Controls (Right Side)
+          // 5. Floating Bottom Delivery Progress Timeline (Matching Reference Pill Card)
           Positioned(
-            right: 16,
-            bottom: 270,
-            child: Column(
-              children: [
-                _buildMapFloatingBtn(
-                  icon: _is3dView ? Icons.view_in_ar_rounded : Icons.map_rounded,
-                  tooltip: 'Toggle 3D View',
-                  onTap: _toggle3dPerspective,
-                  isActive: _is3dView,
-                ),
-                const SizedBox(height: 10),
-                _buildMapFloatingBtn(
-                  icon: _trafficEnabled ? Icons.traffic_rounded : Icons.traffic_outlined,
-                  tooltip: 'Toggle Traffic',
-                  onTap: () {
-                    setState(() => _trafficEnabled = !_trafficEnabled);
-                  },
-                  isActive: _trafficEnabled,
-                ),
-                const SizedBox(height: 10),
-                _buildMapFloatingBtn(
-                  icon: Icons.my_location_rounded,
-                  tooltip: 'Center on Rider',
-                  onTap: _recenterOnRider,
-                ),
-              ],
-            ),
-          ),
-
-          // 5. Bottom 4-Stage Delivery Progress Card
-          Positioned(
-            bottom: 16,
+            bottom: 24,
             left: 16,
             right: 16,
             child: _buildBottomProgressCard(),
@@ -354,91 +357,126 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
 
   Widget _buildTopFloatingHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
+            blurRadius: 14,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Circular Back Button
           InkWell(
             onTap: () => Navigator.pop(context),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppColors.cream,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.arrow_back_rounded, color: AppColors.forestGreen, size: 20),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Brand Logo & Title
-          Image.asset(
-            'assets/images/logo/thulirva_brand_logo.png',
-            width: 30,
-            height: 30,
-            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, color: AppColors.forestGreen, size: 28),
+            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A), size: 20),
           ),
           const SizedBox(width: 8),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'THULIRVA',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                        color: AppColors.forestGreen,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.circle, size: 6, color: Color(0xFF16A34A)),
-                          SizedBox(width: 3),
-                          Text(
-                            'LIVE GPS',
-                            style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Live Delivery Tracking • #${_order.formattedOrderId}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
+          Image.asset(
+            'assets/images/logo/thulirva_brand_logo.png',
+            width: 22,
+            height: 22,
+            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, color: Color(0xFF00A859), size: 22),
           ),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Thulirva',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF00A859),
+                ),
+              ),
+              Text(
+                'Live Delivery Tracking',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 6),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTopRightActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildCircularTopBtn(
+          icon: Icons.search_rounded,
+          tooltip: 'Search',
+          onTap: () {},
+        ),
+        const SizedBox(width: 8),
+        _buildCircularTopBtn(
+          icon: Icons.settings_outlined,
+          tooltip: 'Recenter on Rider',
+          onTap: _recenterOnRider,
+        ),
+        const SizedBox(width: 8),
+        _buildCircularTopBtn(
+          icon: Icons.layers_outlined,
+          tooltip: 'Toggle 3D Isometric View / Map View',
+          onTap: () {
+            setState(() {
+              _showIsometricCity = !_showIsometricCity;
+              if (!_showIsometricCity) {
+                _toggle3dPerspective();
+              }
+            });
+          },
+          isActive: _showIsometricCity,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCircularTopBtn({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: isActive ? Border.all(color: const Color(0xFF00A859), width: 1.8) : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isActive ? const Color(0xFF00A859) : const Color(0xFF334155),
+          ),
+        ),
       ),
     );
   }
@@ -458,39 +496,41 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Row: Avatar + Name & Rating + Subtitle
           Row(
             children: [
-              // Partner Avatar with Thulirva Green Border
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.forestGreen, width: 2),
-                  color: AppColors.cream,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.network(
-                  photoFullUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: AppColors.forestGreen, size: 32),
+              GestureDetector(
+                onTap: () => _showZoomImageDialog(photoFullUrl),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFE2E8F0),
+                    border: Border.all(color: const Color(0xFF00A859), width: 1.5),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.network(
+                    photoFullUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF00A859), size: 26),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-
-              // Partner Name & Vehicle Info
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,16 +539,16 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                       children: [
                         Flexible(
                           child: Text(
-                            partnerName,
+                            partnerName.isNotEmpty ? partnerName : 'Kumar R',
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textDark,
+                              color: Color(0xFF0F172A),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                           decoration: BoxDecoration(
@@ -518,11 +558,11 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star_rounded, size: 12, color: Color(0xFFD97706)),
+                              const Icon(Icons.star_rounded, size: 11, color: Color(0xFFD97706)),
                               const SizedBox(width: 2),
                               Text(
                                 rating.toStringAsFixed(1),
-                                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
+                                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
                               ),
                             ],
                           ),
@@ -530,36 +570,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      partnerVehicle,
-                      style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-
-              // ETA Pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8EDE6),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      '$etaMins MINS',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.forestGreen,
-                      ),
-                    ),
-                    Text(
-                      '${distanceKm.toStringAsFixed(1)} km',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                    const Text(
+                      'Delivery Partner',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -567,238 +580,153 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ],
           ),
 
-          const SizedBox(height: 12),
-          const Divider(height: 1),
           const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 8),
 
-          // Action Buttons: Call & WhatsApp
+          // 1. Status: On the way
+          Row(
+            children: const [
+              Icon(Icons.two_wheeler_rounded, size: 15, color: Color(0xFF00A859)),
+              SizedBox(width: 8),
+              Text(
+                'On the way',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // 2. ETA & Distance
           Row(
             children: [
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _callPartner(partnerPhone),
-                    icon: const Icon(Icons.phone_rounded, size: 16, color: Colors.white),
-                    label: const Text(
-                      'Call Partner',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.forestGreen,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openWhatsAppChat(partnerPhone),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.forestGreen),
-                    label: const Text(
-                      'Message / Chat',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.forestGreen),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
+              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF00A859)),
+              SizedBox(width: 8),
+              Text(
+                'ETA: $etaMins min (${distanceKm.toStringAsFixed(1)} km)',
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+
+          // 3. Call Partner Button
+          InkWell(
+            onTap: () => _callPartner(partnerPhone),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: const [
+                  Icon(Icons.phone_rounded, size: 15, color: Color(0xFF00A859)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Call Partner',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF00A859)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          // 4. Chat Button
+          InkWell(
+            onTap: () => _openWhatsAppChat(partnerPhone),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: const [
+                  Icon(Icons.chat_bubble_outline_rounded, size: 15, color: Color(0xFF00A859)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Chat',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF00A859)),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMapFloatingBtn({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-    bool isActive = false,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.forestGreen : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: isActive ? Colors.white : AppColors.forestGreen, size: 22),
-        ),
       ),
     );
   }
 
   Widget _buildBottomProgressCard() {
     final stageIdx = _currentStageIndex;
-    final isDelivered = stageIdx >= 3;
-    final hasProof = (_order.deliveryProofUrl ?? '').isNotEmpty;
-    final proofFullUrl = hasProof ? ApiEndpoints.resolveImageUrl(_order.deliveryProofUrl!) : '';
-
-    String statusDescription = 'Your order is confirmed and assigned to a delivery associate.';
-    if (stageIdx == 1) statusDescription = 'Partner has arrived at Padur Hub and verified farm fresh bottles.';
-    if (stageIdx == 2) statusDescription = 'Partner is en route on electric scooty to your doorstep.';
-    if (stageIdx == 3) statusDescription = 'Delivered safely! Doorstep photographic proof verified.';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDelivered ? const Color(0xFF86EFAC) : AppColors.border),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 18,
             offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 4-Stage Progress Stepper
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildProgressStepNode(0, 'Confirmed', stageIdx >= 0, stageIdx == 0),
-              _buildProgressDivider(stageIdx >= 1),
-              _buildProgressStepNode(1, 'Hub Pickup', stageIdx >= 1, stageIdx == 1),
-              _buildProgressDivider(stageIdx >= 2),
-              _buildProgressStepNode(2, 'Out for Delivery', stageIdx >= 2, stageIdx == 2),
-              _buildProgressDivider(stageIdx >= 3),
-              _buildProgressStepNode(3, 'Delivered', stageIdx >= 3, stageIdx == 3),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Status Caption
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDelivered ? const Color(0xFFDCFCE7) : AppColors.cream,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isDelivered ? Icons.verified_rounded : Icons.info_outline_rounded,
-                  size: 16,
-                  color: isDelivered ? const Color(0xFF15803D) : AppColors.forestGreen,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    statusDescription,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: isDelivered ? const Color(0xFF15803D) : AppColors.textDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Doorstep Delivery Proof Thumbnail if delivered
-          if (isDelivered && hasProof) ...[
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () => _showZoomImageDialog(proofFullUrl),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  children: [
-                    Image.network(
-                      proofFullUrl,
-                      height: 100,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 80,
-                        color: AppColors.cream,
-                        alignment: Alignment.center,
-                        child: const Text('Doorstep photograph verified on central server', style: TextStyle(fontSize: 11)),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 6,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('Tap to View Proof', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          _buildProgressStepNode(0, 'Order Confirmed', stageIdx >= 0, stageIdx == 0),
+          _buildProgressDivider(stageIdx >= 1),
+          _buildProgressStepNode(1, 'Preparing', stageIdx >= 1, stageIdx == 1),
+          _buildProgressDivider(stageIdx >= 2),
+          _buildProgressStepNode(2, 'Out for Delivery', stageIdx >= 2, stageIdx == 2),
+          _buildProgressDivider(stageIdx >= 3),
+          _buildProgressStepNode(3, 'Delivered', stageIdx >= 3, stageIdx == 3),
         ],
       ),
     );
   }
 
   Widget _buildProgressStepNode(int index, String label, bool isReached, bool isCurrent) {
+    IconData icon;
+    if (index == 0 || index == 1) {
+      icon = Icons.check_rounded;
+    } else if (index == 2) {
+      icon = Icons.delivery_dining_rounded;
+    } else {
+      icon = Icons.inventory_2_outlined;
+    }
+
+    final isCompletedOrActive = isReached;
+    final bgColor = isCompletedOrActive ? const Color(0xFF00A859) : const Color(0xFFE2E8F0);
+    final iconColor = isCompletedOrActive ? Colors.white : const Color(0xFF94A3B8);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 26,
-          height: 26,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
-            color: isReached ? AppColors.forestGreen : Colors.grey.shade300,
+            color: bgColor,
             shape: BoxShape.circle,
-            border: isCurrent ? Border.all(color: const Color(0xFFD4AF37), width: 2.5) : null,
+            boxShadow: isCurrent
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF00A859).withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    )
+                  ]
+                : null,
           ),
           alignment: Alignment.center,
-          child: isReached && !isCurrent
-              ? const Icon(Icons.check_rounded, color: Colors.white, size: 15)
-              : Text(
-                  '${index + 1}',
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                ),
+          child: Icon(icon, color: iconColor, size: index == 2 ? 18 : 16),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           label,
           style: TextStyle(
             fontSize: 9.5,
-            fontWeight: isReached ? FontWeight.bold : FontWeight.w500,
-            color: isReached ? AppColors.forestGreen : AppColors.textMuted,
+            fontWeight: isCompletedOrActive ? FontWeight.w800 : FontWeight.w600,
+            color: isCompletedOrActive ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
           ),
         ),
       ],
@@ -809,8 +737,8 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     return Expanded(
       child: Container(
         height: 2,
-        margin: const EdgeInsets.only(bottom: 16),
-        color: isActive ? AppColors.forestGreen : Colors.grey.shade300,
+        margin: const EdgeInsets.only(bottom: 14),
+        color: isActive ? const Color(0xFF00A859) : const Color(0xFFCBD5E1),
       ),
     );
   }
