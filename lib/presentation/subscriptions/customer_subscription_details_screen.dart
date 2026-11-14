@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../orders/customer_live_tracking_screen.dart';
 
 class CustomerSubscriptionDetailsScreen extends ConsumerStatefulWidget {
   final SubscriptionModel subscription;
@@ -459,6 +460,42 @@ class _CustomerSubscriptionDetailsScreenState
               ),
             ),
             const SizedBox(height: 20),
+
+            // 3.5 LIVE 3D DELIVERY TRACKING BUTTON
+            if (!isExpired && !isCancelled) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CustomerLiveTrackingScreen(
+                          initialOrder: _sub.toOrderModel(),
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.navigation_rounded, color: Colors.white, size: 20),
+                  label: const Text(
+                    'Track Live Delivery in 3D',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.forestGreen,
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ],
 
             // 4. ACTION CONTROLS (Pause/Resume/Cancel)
             if (!isExpired && !isCancelled) ...[

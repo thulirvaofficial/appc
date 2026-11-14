@@ -1,4 +1,5 @@
 import '../../core/utils/safe_parse_util.dart';
+import 'order_model.dart';
 
 class SubscriptionPlanModel {
   final dynamic id;
@@ -225,6 +226,42 @@ class SubscriptionModel {
       rejectionReason: json['rejection_reason'] ?? json['rejectionReason'],
       notes: json['notes'],
       createdAt: json['created_at']?.toString() ?? json['createdAt']?.toString() ?? json['purchase_date']?.toString() ?? startStr,
+    );
+  }
+
+  OrderModel toOrderModel() {
+    final cleanCity = address.toLowerCase().contains('thiruverkadu') ? 'Thiruverkadu' : 'Thiruverkadu';
+    return OrderModel(
+      id: id,
+      userId: userId,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      customerEmail: customerEmail,
+      address: address.isNotEmpty ? address : 'Door No. 12, Farm Lane, Thiruverkadu',
+      city: cleanCity,
+      pincode: '600077',
+      items: [
+        {
+          'name': productName,
+          'quantity': quantity,
+          'price': pricePerDelivery,
+        }
+      ],
+      subtotal: totalPrice,
+      deliveryCharge: 0.0,
+      total: totalPrice,
+      paymentMethod: 'UPI',
+      paymentStatus: paymentStatus,
+      orderStatus: status.toLowerCase() == 'active' ? 'out_for_delivery' : status,
+      createdAt: startDate,
+      partnerName: 'Kumar R',
+      partnerPhone: '9840515293',
+      partnerVehicle: 'Electric Scooter • TN 09 CY 4567',
+      partnerRating: 4.8,
+      partnerLatitude: 12.8055,
+      partnerLongitude: 80.2260,
+      latitude: 12.8090,
+      longitude: 80.2280,
     );
   }
 

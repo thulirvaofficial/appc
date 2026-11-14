@@ -49,3 +49,4 @@ class SafeParseUtil {
     return '$symbol${d.toStringAsFixed(2)}';
   }
 }
+

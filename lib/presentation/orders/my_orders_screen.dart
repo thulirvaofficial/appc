@@ -503,7 +503,6 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
     final statusFg = _getStatusFgColor(order.orderStatus);
     final isPickup = order.isPickup || order.deliveryType.toLowerCase() == 'pickup';
     final sStatus = order.orderStatus.toLowerCase().replaceAll(' ', '_');
-    final isOutForDelivery = sStatus == 'out_for_delivery' || sStatus == 'shipped' || sStatus == 'in_transit' || sStatus == 'pickup_confirmed';
 
     String itemsSummary = '';
     if (order.items.isNotEmpty) {
@@ -737,7 +736,7 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isOutForDelivery && !isPickup) ...[
+                    if (!isPickup && sStatus != 'cancelled' && sStatus != 'failed') ...[
                       InkWell(
                         onTap: () {
                           Navigator.push(
@@ -1042,8 +1041,44 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
+                  children: [
+                    if (sub.status.toLowerCase() == 'active') ...[
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CustomerLiveTrackingScreen(initialOrder: sub.toOrderModel()),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.forestGreen,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.navigation_rounded, size: 12, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Live Track',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    const Text(
                       'View Details',
                       style: TextStyle(
                         fontSize: 12,
@@ -1051,8 +1086,8 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
                         color: AppColors.forestGreen,
                       ),
                     ),
-                    SizedBox(width: 3),
-                    Icon(Icons.chevron_right, size: 15, color: AppColors.forestGreen),
+                    const SizedBox(width: 3),
+                    const Icon(Icons.chevron_right, size: 15, color: AppColors.forestGreen),
                   ],
                 ),
               ],

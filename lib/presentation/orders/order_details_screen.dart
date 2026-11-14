@@ -297,11 +297,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     final statusBg = _getStatusBgColor(order.orderStatus);
     final statusFg = _getStatusFgColor(order.orderStatus);
     final isPickup = order.isPickup || order.deliveryType.toLowerCase() == 'pickup';
-    final isOutForDelivery = order.orderStatus.toLowerCase() == 'out_for_delivery' ||
-        order.orderStatus.toLowerCase() == 'shipped' ||
-        order.orderStatus.toLowerCase() == 'in_transit' ||
-        order.orderStatus.toLowerCase() == 'pickup_confirmed';
     final isDelivered = order.orderStatus.toLowerCase() == 'delivered';
+    final isCancelled = order.orderStatus.toLowerCase() == 'cancelled';
+    final isTrackable = !isPickup && !isDelivered && !isCancelled;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF8EF),
@@ -430,8 +428,8 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             _buildTimelineCard(order.orderStatus, isPickup),
             const SizedBox(height: 16),
 
-            // LIVE TRACKING & PARTNER CARD (When Out for Delivery)
-            if (isOutForDelivery && !isPickup) ...[
+            // LIVE TRACKING & PARTNER CARD (When Out for Delivery or Active)
+            if (isTrackable && !isPickup) ...[
               _buildLiveTrackingBanner(order),
               const SizedBox(height: 16),
             ],

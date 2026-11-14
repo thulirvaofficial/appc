@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/notification_permission_service.dart';
 import '../../core/utils/id_formatter.dart';
+import '../../data/models/order_model.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -11,11 +12,13 @@ import '../../providers/cart_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/coupon_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../cart/cart_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../orders/customer_live_tracking_screen.dart';
 import '../products/product_details_screen.dart';
 import '../products/products_list_screen.dart';
 import '../location/location_picker_screen.dart';
@@ -112,6 +115,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final products = productState.featuredProducts;
     final activeSubs = subState.activeSubscriptions;
     final coupons = couponState.coupons;
+    final orderState = ref.watch(orderProvider);
+
+    OrderModel? activeTrackingOrder;
+    for (final o in orderState.orders) {
+      final s = o.orderStatus.toLowerCase();
+      if (!o.isPickup && s != 'delivered' && s != 'cancelled' && s != 'failed') {
+        activeTrackingOrder = o;
+        break;
+      }
+    }
+    if (activeTrackingOrder == null && activeSubs.isNotEmpty) {
+      activeTrackingOrder = activeSubs.first.toOrderModel();
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF8EF),
@@ -385,6 +401,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ],
                           ),
                         ),
+                      ],
+
+                      // 🛵 LIVE 3D DELIVERY TRACKING BANNER (Direct Access from Home)
+                      if (activeTrackingOrder != null) ...[
+                        _buildLiveTrackingBanner(context, activeTrackingOrder),
+                        const SizedBox(height: 14),
                       ],
 
                       // Promotional Hero Banner (Auto-sliding)
@@ -1063,6 +1085,138 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildLiveTrackingBanner(BuildContext context, OrderModel order) {
+    final partnerName = (order.partnerName != null && order.partnerName!.trim().isNotEmpty)
+        ? order.partnerName!
+        : 'Kumar R';
+    final destination = (order.city.isNotEmpty ? order.city : (order.address.isNotEmpty ? order.address.split(',').first : 'Thiruverkadu')).trim();
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CustomerLiveTrackingScreen(initialOrder: order),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1B4D3E), Color(0xFF0F362A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1B4D3E).withValues(alpha: 0.25),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00A859).withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF00A859), width: 1.5),
+              ),
+              child: const Icon(Icons.two_wheeler_rounded, color: Color(0xFF00E676), size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF00E676),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'LIVE DELIVERY IN PROGRESS',
+                        style: TextStyle(
+                          color: Color(0xFF86EFAC),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Partner: $partnerName • On the way',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Delivering to $destination • ETA: 12 min',
+                    style: const TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00A859),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00A859).withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Text(
+                    'Track 3D',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(width: 3),
+                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
