@@ -355,8 +355,8 @@ class CustomerBikeMarkerGenerator {
   }
 
   /// Customer Destination Pin: "Customer \n <Area>" matching reference image
-  static Future<BitmapDescriptor> getCustomerPin({String area = 'Thiruverkadu'}) async {
-    final cleanArea = area.trim().isNotEmpty ? area.trim() : 'Thiruverkadu';
+  static Future<BitmapDescriptor> getCustomerPin({String area = 'Delivery Location'}) async {
+    final cleanArea = area.trim().isNotEmpty ? area.trim() : 'Delivery Location';
     final key = 'customer_pin_${cleanArea.hashCode}';
     if (_cache.containsKey(key)) return _cache[key]!;
 

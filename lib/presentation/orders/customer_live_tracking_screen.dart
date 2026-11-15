@@ -14,7 +14,6 @@ import '../../core/utils/customer_bike_marker_generator.dart';
 import '../../data/models/order_model.dart';
 import '../../providers/order_provider.dart';
 import 'widgets/in_app_chat_sheet.dart';
-import 'widgets/thulirva_3d_isometric_city_view.dart';
 
 class CustomerLiveTrackingScreen extends ConsumerStatefulWidget {
   final OrderModel initialOrder;
@@ -40,8 +39,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
   bool _is3dView = true;
   final bool _trafficEnabled = false;
 
-  // View Mode: Real Google Maps 3D Live Delivery Tracking (Worldwide) vs 3D Isometric Stylized City
-  bool _showIsometricCity = false;
+  // View Mode: Real Google Maps 3D Live Delivery Tracking (Worldwide)
   MapType _currentMapType = MapType.normal;
 
   // Custom Markers Cache
@@ -363,7 +361,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     try {
       final customerArea = (_order.city.isNotEmpty
               ? _order.city
-              : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Thiruverkadu'))
+              : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Delivery Location'))
           .trim();
 
       final rider = await CustomerBikeMarkerGenerator.getRiderMarker(
@@ -452,23 +450,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         _order.longitude! != 0) {
       return LatLng(_order.latitude!, _order.longitude!);
     }
-    final fullText = '${_order.address} ${_order.city} ${_order.pincode}'.toLowerCase();
-    if (fullText.contains('thiruverkadu') ||
-        fullText.contains('600077') ||
-        _order.city.toLowerCase() == 'thiruverkadu' ||
-        _order.city.isEmpty) {
-      return const LatLng(13.0694, 80.1247); // Genuine Thiruverkadu, Chennai destination
-    }
-    if (fullText.contains('porur') || fullText.contains('600116')) {
-      return const LatLng(13.0382, 80.1565);
-    }
-    if (fullText.contains('kk nagar') || fullText.contains('600078')) {
-      return const LatLng(13.0410, 80.1994);
-    }
-    if (fullText.contains('padur') || fullText.contains('603103')) {
-      return const LatLng(12.8025, 80.2233);
-    }
-    return const LatLng(13.0694, 80.1247);
+    return _valasaravakkamHubPos;
   }
 
   LatLng? get _resolvedRiderPos {
@@ -676,11 +658,6 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       statusDisplay = 'Preparing Order (Valasaravakkam Hub)';
     }
 
-    final customerArea = (_order.city.isNotEmpty
-            ? _order.city
-            : (_order.address.isNotEmpty ? _order.address.split(',').first : 'Thiruverkadu'))
-        .trim();
-
     // 1. Google Map Custom Markers
     final markers = <Marker>{
       // Origin Hub (Shown during preparing and out for delivery)
@@ -775,62 +752,41 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
       };
     }
 
-    double routeProgress = 0.55;
-    if (_currentStageIndex == 0) {
-      routeProgress = 0.08;
-    } else if (_currentStageIndex == 1) {
-      routeProgress = 0.25;
-    } else if (_currentStageIndex == 2) {
-      routeProgress = 0.62;
-    } else if (_currentStageIndex >= 3) {
-      routeProgress = 0.95;
-    }
-
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       body: Stack(
         children: [
-          // 1. Primary Live Map Engine (Real Google Maps 3D vs 3D Isometric Stylized City)
-          if (_showIsometricCity)
-            Positioned.fill(
-              child: Thulirva3DIsometricCityView(
-                progress: routeProgress,
-                hubName: 'Thulirva Central Hub',
-                customerArea: customerArea,
-                onRecenter: _recenterOnRider,
+          // 1. Primary Live Map Engine (Real Google Maps 3D Worldwide)
+          Positioned.fill(
+            child: GoogleMap(
+              mapType: _currentMapType,
+              initialCameraPosition: CameraPosition(
+                target: riderPos ?? customerPos,
+                zoom: riderPos != null ? 17.5 : 14.5,
+                tilt: _currentTilt,
+                bearing: _animatedHeading,
               ),
-            )
-          else
-            Positioned.fill(
-              child: GoogleMap(
-                mapType: _currentMapType,
-                initialCameraPosition: CameraPosition(
-                  target: riderPos ?? customerPos,
-                  zoom: riderPos != null ? 17.5 : 14.5,
-                  tilt: _currentTilt,
-                  bearing: _animatedHeading,
-                ),
-                markers: markers,
-                polylines: polylines,
-                trafficEnabled: _trafficEnabled,
-                myLocationEnabled: false,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                mapToolbarEnabled: false,
-                compassEnabled: true,
-                buildingsEnabled: true,
-                onMapCreated: (ctrl) {
-                  _mapController = ctrl;
-                  if (riderPos != null) {
-                    _recenterOnRider();
-                  } else {
-                    _recenterOverview();
-                  }
-                },
-              ),
+              markers: markers,
+              polylines: polylines,
+              trafficEnabled: _trafficEnabled,
+              myLocationEnabled: false,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: true,
+              buildingsEnabled: true,
+              onMapCreated: (ctrl) {
+                _mapController = ctrl;
+                if (riderPos != null) {
+                  _recenterOnRider();
+                } else {
+                  _recenterOverview();
+                }
+              },
             ),
+          ),
 
           // 2. Floating Top Header & Action Buttons (Unified responsive single Row)
           Positioned(
@@ -847,18 +803,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             ),
           ),
 
-          // 3. Floating View Mode Toggle Pill (Instant Switch between Real Google 3D & 3D Isometric View)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + (isLandscape ? 8 : 62),
-            left: isLandscape ? 280 : 16,
-            right: isLandscape ? null : 16,
-            child: Align(
-              alignment: isLandscape ? Alignment.centerLeft : Alignment.center,
-              child: _buildModeTogglePill(),
-            ),
-          ),
-
-          // 4. Geofence 100m Arrival Alert Banner
+          // 3. Geofence 100m Arrival Alert Banner
           if (_hasArrivedAtGeofence && isOutForDelivery)
             Positioned(
               top: MediaQuery.of(context).padding.top + (isLandscape ? 48 : 58),
@@ -867,9 +812,9 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               child: _buildArrivalGeofenceBanner(),
             ),
 
-          // 5. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
+          // 4. Floating Delivery Partner Card (Pinned to Left Side per Reference Image)
           Positioned(
-            top: MediaQuery.of(context).padding.top + (isLandscape ? 52 : (_hasArrivedAtGeofence && isOutForDelivery ? 128 : 108)),
+            top: MediaQuery.of(context).padding.top + (isLandscape ? 52 : (_hasArrivedAtGeofence && isOutForDelivery ? 120 : 68)),
             left: 16,
             width: isLandscape ? 250 : 240,
             child: _buildPartnerInfoCard(
@@ -957,75 +902,6 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
     );
   }
 
-  Widget _buildModeTogglePill() {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildPillTab(
-            label: '🗺️ Google 3D',
-            isSelected: !_showIsometricCity,
-            onTap: () {
-              if (_showIsometricCity) {
-                setState(() => _showIsometricCity = false);
-                _recenterOnRider();
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-          _buildPillTab(
-            label: '🏙️ 3D City',
-            isSelected: _showIsometricCity,
-            onTap: () {
-              if (!_showIsometricCity) {
-                setState(() => _showIsometricCity = true);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPillTab({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF00A859) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF475569),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTopRightActions() {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -1061,20 +937,19 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
         const SizedBox(width: 6),
         _buildCircularTopBtn(
           icon: Icons.layers_outlined,
-          tooltip: 'Cycle Map Style (Google 3D / Satellite / Isometric)',
+          tooltip: 'Cycle Map Style (Normal / Satellite / Terrain)',
           onTap: () {
             setState(() {
-              if (_showIsometricCity) {
-                _showIsometricCity = false;
-                _currentMapType = MapType.normal;
-              } else if (_currentMapType == MapType.normal) {
+              if (_currentMapType == MapType.normal) {
                 _currentMapType = MapType.hybrid;
+              } else if (_currentMapType == MapType.hybrid) {
+                _currentMapType = MapType.terrain;
               } else {
-                _showIsometricCity = true;
+                _currentMapType = MapType.normal;
               }
             });
           },
-          isActive: !_showIsometricCity,
+          isActive: _currentMapType != MapType.normal,
         ),
       ],
     );

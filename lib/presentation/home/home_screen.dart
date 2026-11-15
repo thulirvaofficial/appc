@@ -122,13 +122,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     OrderModel? activeTrackingOrder;
     for (final o in orderState.orders) {
       final s = o.orderStatus.toLowerCase();
-      if (!o.isPickup && s != 'delivered' && s != 'cancelled' && s != 'failed') {
+      // Live tracking card is STRICTLY shown only when order is assigned to partner or out for delivery
+      if (!o.isPickup &&
+          (s == 'assigned' || s == 'picked_up' || s == 'out_for_delivery' || s == 'in_transit')) {
         activeTrackingOrder = o;
         break;
       }
-    }
-    if (activeTrackingOrder == null && activeSubs.isNotEmpty) {
-      activeTrackingOrder = activeSubs.first.toOrderModel();
     }
 
     return Scaffold(
@@ -1095,7 +1094,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final partnerName = (order.partnerName != null && order.partnerName!.trim().isNotEmpty)
         ? order.partnerName!
         : 'Assigned Partner';
-    final destination = (order.city.isNotEmpty ? order.city : (order.address.isNotEmpty ? order.address.split(',').first : 'Thiruverkadu')).trim();
+    final destination = (order.city.isNotEmpty ? order.city : (order.address.isNotEmpty ? order.address.split(',').first : 'Delivery Location')).trim();
 
     // Centralized dynamic ETA calculation from GPS coordinates
     final etaText = DeliveryTrackingUtil.formatEta(

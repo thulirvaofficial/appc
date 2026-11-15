@@ -230,20 +230,15 @@ class SubscriptionModel {
   }
 
   OrderModel toOrderModel() {
-    final isThiruverkadu = address.toLowerCase().contains('thiruverkadu') || address.isEmpty;
-    final cleanCity = isThiruverkadu ? 'Thiruverkadu' : 'Chennai';
-    final double defaultLat = isThiruverkadu ? 13.0694 : 13.0827;
-    final double defaultLng = isThiruverkadu ? 80.1247 : 80.2707;
-
     return OrderModel(
       id: id,
       userId: userId,
       customerName: customerName,
       customerPhone: customerPhone,
       customerEmail: customerEmail,
-      address: address.isNotEmpty ? address : 'Door No. 12, Farm Lane, Thiruverkadu',
-      city: cleanCity,
-      pincode: isThiruverkadu ? '600077' : '600001',
+      address: address.isNotEmpty ? address : 'Delivery Address',
+      city: 'Chennai',
+      pincode: '600000',
       items: [
         {
           'name': productName,
@@ -264,8 +259,8 @@ class SubscriptionModel {
       partnerRating: null,
       partnerLatitude: null,
       partnerLongitude: null,
-      latitude: defaultLat,
-      longitude: defaultLng,
+      latitude: null,
+      longitude: null,
     );
   }
 
