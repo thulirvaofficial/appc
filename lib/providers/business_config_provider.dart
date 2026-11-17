@@ -207,18 +207,33 @@ class BusinessConfigNotifier extends StateNotifier<BusinessConfigState> {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.get(ApiEndpoints.launchBanner);
-      if (res.data != null && res.data['success'] == true && res.data['banner'] != null) {
-        final b = res.data['banner'] as Map<String, dynamic>;
-        state = state.copyWith(
-          bannerEnabled: b['enabled'] == true,
-          bannerHeadline: b['headline'] ?? '',
-          bannerSubtitle: b['subtitle'] ?? '',
-          bannerBgColor: b['bg_color'] ?? '#1B4332',
-          bannerImageUrl: b['image_url'] ?? '',
-        );
+      if (res.data != null && res.data['success'] == true) {
+        final b = res.data['banner'] as Map<String, dynamic>?;
+        if (b != null && b['enabled'] == true) {
+          state = state.copyWith(
+            bannerEnabled: true,
+            bannerHeadline: b['headline'] ?? '',
+            bannerSubtitle: b['subtitle'] ?? '',
+            bannerBgColor: b['bg_color'] ?? b['background_color'] ?? '#1B4332',
+            bannerImageUrl: b['image_url'] ?? '',
+          );
+          return;
+        }
       }
+      state = state.copyWith(
+        bannerEnabled: false,
+        bannerHeadline: '',
+        bannerSubtitle: '',
+        bannerImageUrl: '',
+      );
     } catch (e) {
       debugPrint('[BusinessConfig] Error fetching launch banner: $e');
+      state = state.copyWith(
+        bannerEnabled: false,
+        bannerHeadline: '',
+        bannerSubtitle: '',
+        bannerImageUrl: '',
+      );
     }
   }
 }
