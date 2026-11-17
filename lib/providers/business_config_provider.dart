@@ -28,6 +28,9 @@ class BusinessConfigState {
   final bool isQrActive;
   final int qrVersion;
 
+  // Master Cash on Delivery (COD) Switch
+  final bool codEnabled;
+
   // Dynamic Launch Banner
   final bool bannerEnabled;
   final String bannerHeadline;
@@ -56,6 +59,7 @@ class BusinessConfigState {
     this.qrImageUrl = '',
     this.isQrActive = true,
     this.qrVersion = 1,
+    this.codEnabled = true,
     this.bannerEnabled = false,
     this.bannerHeadline = '',
     this.bannerSubtitle = '',
@@ -92,6 +96,7 @@ class BusinessConfigState {
     String? qrImageUrl,
     bool? isQrActive,
     int? qrVersion,
+    bool? codEnabled,
     bool? bannerEnabled,
     String? bannerHeadline,
     String? bannerSubtitle,
@@ -118,6 +123,7 @@ class BusinessConfigState {
       qrImageUrl: qrImageUrl ?? this.qrImageUrl,
       isQrActive: isQrActive ?? this.isQrActive,
       qrVersion: qrVersion ?? this.qrVersion,
+      codEnabled: codEnabled ?? this.codEnabled,
       bannerEnabled: bannerEnabled ?? this.bannerEnabled,
       bannerHeadline: bannerHeadline ?? this.bannerHeadline,
       bannerSubtitle: bannerSubtitle ?? this.bannerSubtitle,
@@ -139,10 +145,25 @@ class BusinessConfigNotifier extends StateNotifier<BusinessConfigState> {
     state = state.copyWith(isLoading: true);
     await Future.wait([
       fetchDeliveryConfig(),
+      fetchCodConfig(),
       fetchPaymentQr(),
       fetchLaunchBanner(),
     ]);
     state = state.copyWith(isLoading: false);
+  }
+
+  Future<void> fetchCodConfig() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get(ApiEndpoints.codConfig);
+      if (res.data != null && res.data['success'] == true) {
+        state = state.copyWith(
+          codEnabled: res.data['cod_enabled'] ?? state.codEnabled,
+        );
+      }
+    } catch (e) {
+      debugPrint('[BusinessConfig] Error fetching COD config: $e');
+    }
   }
 
   Future<void> fetchDeliveryConfig() async {

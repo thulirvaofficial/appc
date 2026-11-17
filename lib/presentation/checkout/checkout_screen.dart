@@ -57,6 +57,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   File? _paymentProofFile;
   String? _paymentProofBase64;
   final ImagePicker _picker = ImagePicker();
+  String _paymentMode = 'UPI';
 
   @override
   void initState() {
@@ -288,8 +289,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final user = ref.read(authProvider).user;
     final addressState = ref.read(addressProvider);
     final storeSettings = ref.read(settingsProvider);
+    final bizConfig = ref.read(businessConfigProvider);
     final isPickupOnlyAdmin = storeSettings.isPickupOnly;
     final isPickup = isPickupOnlyAdmin || _deliveryMethod == 'pickup';
+
+    final hasSubscriptions = cartState.items.any((i) =>
+        i.product.category.toLowerCase() == 'subscription' ||
+        i.product.id.toString().startsWith('SUB_') ||
+        i.product.name.toLowerCase().contains('(30 days plan)') ||
+        i.product.name.toLowerCase().contains('subscription plan'));
+
+    if ((hasSubscriptions || !bizConfig.codEnabled) && _paymentMode == 'COD') {
+      _paymentMode = 'UPI';
+    }
 
     final selectedAddr = addressState.selectedAddress ??
         (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
@@ -341,7 +353,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
     }
 
-    final bizConfig = ref.read(businessConfigProvider);
     if (!isPickup && !bizConfig.isDeliveryAvailable && !bizConfig.canOrder) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -357,25 +368,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
+    final isCod = _paymentMode == 'COD' && !hasSubscriptions && bizConfig.codEnabled;
     final utrText = _utrController.text.trim();
-    if (utrText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter UPI Transaction ID / UTR Number to verify payment'),
-          backgroundColor: AppColors.cancelled,
-        ),
-      );
-      return;
-    }
 
-    if (_paymentProofBase64 == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please upload your payment screenshot proof'),
-          backgroundColor: AppColors.cancelled,
-        ),
-      );
-      return;
+    if (!isCod) {
+      if (utrText.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter UPI Transaction ID / UTR Number to verify payment'),
+            backgroundColor: AppColors.cancelled,
+          ),
+        );
+        return;
+      }
+
+      if (_paymentProofBase64 == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please upload your payment screenshot proof'),
+            backgroundColor: AppColors.cancelled,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _isSubmitting = true);
@@ -538,10 +553,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'promo_code': cartState.appliedCouponCode,
       'total': calculatedGrandTotal,
       'total_price': calculatedGrandTotal,
-      'payment_method': 'UPI QR ($activeUpiId)',
-      'transaction_id': utrText,
-      'payment_proof': _paymentProofBase64,
-      'payment_status': 'Verification Pending',
+      'payment_method': isCod ? 'Cash on Delivery (COD)' : 'UPI QR ($activeUpiId)',
+      'transaction_id': isCod ? 'COD' : utrText,
+      'payment_proof': isCod ? null : _paymentProofBase64,
+      'payment_status': isCod ? 'PENDING' : 'Verification Pending',
       'order_status': 'pending',
     };
 
@@ -584,6 +599,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final bizConfig = ref.watch(businessConfigProvider);
     final isPickupOnlyAdmin = storeSettings.isPickupOnly;
     final isPickup = isPickupOnlyAdmin || _deliveryMethod == 'pickup';
+
+    final hasSubscriptions = cartState.items.any((i) =>
+        i.product.category.toLowerCase() == 'subscription' ||
+        i.product.id.toString().startsWith('SUB_') ||
+        i.product.name.toLowerCase().contains('(30 days plan)') ||
+        i.product.name.toLowerCase().contains('subscription plan'));
+
+    if ((hasSubscriptions || !bizConfig.codEnabled) && _paymentMode == 'COD') {
+      _paymentMode = 'UPI';
+    }
 
     final selectedAddr = addressState.selectedAddress ??
         (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
@@ -1192,21 +1217,217 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       children: [
                         Row(
                           children: const [
-                            Icon(Icons.qr_code_2, color: AppColors.forestGreen, size: 22),
+                            Icon(Icons.payment_rounded, color: AppColors.forestGreen, size: 22),
                             SizedBox(width: 8),
                             Text(
-                              'Payment: Merchant UPI QR',
+                              'Payment Method',
                               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Scan and pay directly using any UPI app (Google Pay, PhonePe, Paytm, BHIM, Cred, Bank UPI).',
-                          style: TextStyle(fontSize: 11.5, color: Color(0xFF6E8072)),
-                        ),
                         const SizedBox(height: 12),
 
+                        // Payment Mode Selector (UPI vs COD)
+                        RadioGroup<String>(
+                          groupValue: _paymentMode,
+                          onChanged: (val) {
+                            if (val != null) {
+                              if (val == 'COD' && (hasSubscriptions || !bizConfig.codEnabled)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      hasSubscriptions
+                                          ? 'Milk Subscriptions require 100% online advance payment via UPI.'
+                                          : 'Cash on Delivery is temporarily disabled storewide. Please pay online via UPI.',
+                                    ),
+                                    backgroundColor: const Color(0xFFB45309),
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                                return;
+                              }
+                              setState(() => _paymentMode = val);
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Option 1: Instant Online Payment via UPI
+                              InkWell(
+                                onTap: () => setState(() => _paymentMode = 'UPI'),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _paymentMode == 'UPI' ? const Color(0xFFF0FDF4) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _paymentMode == 'UPI' ? AppColors.forestGreen : const Color(0xFFE5EDE2),
+                                      width: _paymentMode == 'UPI' ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Radio<String>(
+                                        value: 'UPI',
+                                        activeColor: AppColors.forestGreen,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: const [
+                                            Text(
+                                              'Instant Online Payment (UPI / QR)',
+                                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.forestGreen),
+                                            ),
+                                            Text(
+                                              'Google Pay, PhonePe, Paytm, BHIM, Cred or any UPI app',
+                                              style: TextStyle(fontSize: 11, color: Color(0xFF6E8072)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // Option 2: Cash on Delivery (COD)
+                              InkWell(
+                                onTap: (hasSubscriptions || !bizConfig.codEnabled)
+                                    ? () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              hasSubscriptions
+                                                  ? 'Milk Subscriptions require 100% online advance payment via UPI.'
+                                                  : 'Cash on Delivery is temporarily disabled storewide. Please pay online via UPI.',
+                                            ),
+                                            backgroundColor: const Color(0xFFB45309),
+                                            duration: const Duration(seconds: 3),
+                                          ),
+                                        );
+                                      }
+                                    : () => setState(() => _paymentMode = 'COD'),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _paymentMode == 'COD' ? const Color(0xFFFFFBEB) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _paymentMode == 'COD'
+                                          ? const Color(0xFFD97706)
+                                          : (hasSubscriptions || !bizConfig.codEnabled ? Colors.grey.shade200 : const Color(0xFFE5EDE2)),
+                                      width: _paymentMode == 'COD' ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Radio<String>(
+                                        value: 'COD',
+                                        activeColor: const Color(0xFFD97706),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  'Cash on Delivery (COD)',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 13,
+                                                    color: (hasSubscriptions || !bizConfig.codEnabled)
+                                                        ? Colors.grey
+                                                        : const Color(0xFF92400E),
+                                                  ),
+                                                ),
+                                                if (hasSubscriptions || !bizConfig.codEnabled) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.grey.shade100,
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: const Text(
+                                                      'Unavailable',
+                                                      style: TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            Text(
+                                              hasSubscriptions
+                                                  ? 'Milk subscriptions require online payment'
+                                                  : (!bizConfig.codEnabled
+                                                      ? 'Disabled storewide by admin'
+                                                      : 'Pay cash to delivery executive at doorstep'),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: (hasSubscriptions || !bizConfig.codEnabled) ? Colors.grey : const Color(0xFFB45309),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        if (_paymentMode == 'COD') ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFFDE68A)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFFEF3C7),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.payments_rounded, color: Color(0xFFB45309), size: 24),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Cash on Delivery Selected',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF92400E)),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        'Please keep ₹${calculatedGrandTotal.toStringAsFixed(0)} in cash ready for handover at your doorstep upon delivery.',
+                                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF78350F)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
                         // Themed QR Container
                         Container(
                           width: double.infinity,
@@ -1430,6 +1651,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             ),
                           ),
                         ],
+                        ],
                       ],
                     ),
                   ),
@@ -1513,7 +1735,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ),
             child: SafeArea(
               child: ThulirvaButton(
-                text: 'Verify & Place Order • ₹${calculatedGrandTotal.toStringAsFixed(0)}',
+                text: _paymentMode == 'COD'
+                    ? 'Confirm COD Order • ₹${calculatedGrandTotal.toStringAsFixed(0)}'
+                    : 'Verify & Place Order • ₹${calculatedGrandTotal.toStringAsFixed(0)}',
                 isLoading: _isSubmitting || orderState.isPlacingOrder || subState.isSubmitting,
                 onPressed: (_isSubmitting || orderState.isPlacingOrder || subState.isSubmitting)
                     ? null

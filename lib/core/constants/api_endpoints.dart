@@ -145,6 +145,7 @@ class ApiEndpoints {
 
   // Business & Delivery Configuration
   static const String deliveryConfig = '/config/delivery';
+  static const String codConfig = '/config/cod';
   static const String calculateDeliveryCharge = '/config/delivery/calculate-charge';
   static const String deliveryAvailability = '/config/delivery/availability';
   static const String launchBanner = '/config/launch-banner';
