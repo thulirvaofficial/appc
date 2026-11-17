@@ -4,6 +4,7 @@ import '../core/storage/storage_service.dart';
 import '../data/models/cart_item_model.dart';
 import '../data/models/product_model.dart';
 import 'api_provider.dart';
+import 'business_config_provider.dart';
 import 'settings_provider.dart';
 
 class CartState {
@@ -13,6 +14,9 @@ class CartState {
   final String? couponMessage;
   final bool isApplyingCoupon;
   final bool isPickupOnly;
+  final double fixedDeliveryCharge;
+  final double freeDeliveryThreshold;
+  final bool deliveryChargesEnabled;
 
   CartState({
     this.items = const [],
@@ -21,6 +25,9 @@ class CartState {
     this.couponMessage,
     this.isApplyingCoupon = false,
     this.isPickupOnly = false,
+    this.fixedDeliveryCharge = 30.0,
+    this.freeDeliveryThreshold = 299.0,
+    this.deliveryChargesEnabled = true,
   });
 
   int get totalItemCount => items.fold(0, (sum, i) => sum + i.quantity);
@@ -29,7 +36,9 @@ class CartState {
 
   double get deliveryCharge {
     if (isPickupOnly) return 0.0;
-    return (subtotal >= 299.0 || subtotal == 0.0) ? 0.0 : 30.0;
+    if (!deliveryChargesEnabled) return 0.0;
+    if (subtotal == 0.0) return 0.0;
+    return (subtotal >= freeDeliveryThreshold) ? 0.0 : fixedDeliveryCharge;
   }
 
   double get grandTotal {
@@ -44,6 +53,9 @@ class CartState {
     String? couponMessage,
     bool? isApplyingCoupon,
     bool? isPickupOnly,
+    double? fixedDeliveryCharge,
+    double? freeDeliveryThreshold,
+    bool? deliveryChargesEnabled,
   }) {
     return CartState(
       items: items ?? this.items,
@@ -52,6 +64,9 @@ class CartState {
       couponMessage: couponMessage ?? this.couponMessage,
       isApplyingCoupon: isApplyingCoupon ?? this.isApplyingCoupon,
       isPickupOnly: isPickupOnly ?? this.isPickupOnly,
+      fixedDeliveryCharge: fixedDeliveryCharge ?? this.fixedDeliveryCharge,
+      freeDeliveryThreshold: freeDeliveryThreshold ?? this.freeDeliveryThreshold,
+      deliveryChargesEnabled: deliveryChargesEnabled ?? this.deliveryChargesEnabled,
     );
   }
 }
@@ -60,7 +75,27 @@ class CartNotifier extends StateNotifier<CartState> {
   final Ref ref;
 
   CartNotifier(this.ref) : super(CartState()) {
+    final biz = ref.read(businessConfigProvider);
+    state = state.copyWith(
+      fixedDeliveryCharge: biz.fixedDeliveryCharge,
+      freeDeliveryThreshold: biz.freeDeliveryThreshold,
+      deliveryChargesEnabled: biz.deliveryChargesEnabled,
+    );
     _loadCart();
+
+    // Listen to business configuration updates
+    ref.listen<BusinessConfigState>(businessConfigProvider, (prev, next) {
+      if (next.fixedDeliveryCharge != state.fixedDeliveryCharge ||
+          next.freeDeliveryThreshold != state.freeDeliveryThreshold ||
+          next.deliveryChargesEnabled != state.deliveryChargesEnabled) {
+        state = state.copyWith(
+          fixedDeliveryCharge: next.fixedDeliveryCharge,
+          freeDeliveryThreshold: next.freeDeliveryThreshold,
+          deliveryChargesEnabled: next.deliveryChargesEnabled,
+        );
+      }
+    });
+
     // Listen to store settings pickup mode
     ref.listen<StoreSettingsState>(settingsProvider, (prev, next) {
       if (next.isPickupOnly != state.isPickupOnly) {

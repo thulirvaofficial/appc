@@ -21,10 +21,26 @@ class ApiEndpoints {
   // Resolve static asset images from backend server
   static String resolveImageUrl(String path) {
     if (path.isEmpty) return '';
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    final cleanPath = path.startsWith('/') ? path : '/$path';
+    if (path.startsWith('data:image/')) return path;
+
+    String cleanPath = path.replaceAll(r'\', '/').trim();
+
+    // If path is already an absolute URL pointing to /uploads/ without /api/, rewrite it to include /api/
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+      final uri = Uri.tryParse(cleanPath);
+      if (uri != null && uri.path.startsWith('/uploads/')) {
+        return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}/api${uri.path}';
+      }
+      return cleanPath;
+    }
+
+    if (!cleanPath.startsWith('/')) cleanPath = '/$cleanPath';
+
     if (cleanPath.startsWith('/uploads/')) {
-      return '$baseUrl$cleanPath';
+      return '$serverRoot/api$cleanPath';
+    }
+    if (cleanPath.startsWith('/api/uploads/')) {
+      return '$serverRoot$cleanPath';
     }
     return '$serverRoot$cleanPath';
   }
@@ -32,10 +48,11 @@ class ApiEndpoints {
   // Returns ordered list of candidate URLs for multi-host image loading
   static List<String> getCandidateImageUrls(String path) {
     if (path.isEmpty) return [];
+    if (path.startsWith('data:image/')) return [path];
 
-    String cleanPath = path;
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      final uri = Uri.tryParse(path);
+    String cleanPath = path.replaceAll(r'\', '/').trim();
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+      final uri = Uri.tryParse(cleanPath);
       if (uri != null) {
         cleanPath = uri.path;
       }
@@ -44,12 +61,11 @@ class ApiEndpoints {
 
     final candidates = <String>[];
 
-    // Priority 1: If path is in /uploads/, request via /api/uploads/ which Nginx proxies directly to Express
+    // Priority 1: Express endpoint via /api/uploads/
     if (cleanPath.startsWith('/uploads/')) {
-      final apiCandidate = '$baseUrl$cleanPath';
-      if (!candidates.contains(apiCandidate)) {
-        candidates.add(apiCandidate);
-      }
+      candidates.add('$serverRoot/api$cleanPath');
+    } else if (cleanPath.startsWith('/api/uploads/')) {
+      candidates.add('$serverRoot$cleanPath');
     }
 
     final hostList = [
@@ -64,6 +80,11 @@ class ApiEndpoints {
       final cleanHost = host.replaceAll(RegExp(r'/api/?$'), '');
       if (cleanPath.startsWith('/uploads/')) {
         final apiVariant = '$cleanHost/api$cleanPath';
+        if (!candidates.contains(apiVariant)) {
+          candidates.add(apiVariant);
+        }
+      } else if (cleanPath.startsWith('/api/uploads/')) {
+        final apiVariant = '$cleanHost$cleanPath';
         if (!candidates.contains(apiVariant)) {
           candidates.add(apiVariant);
         }
@@ -121,6 +142,13 @@ class ApiEndpoints {
   static const String activeServiceableAreas = '/serviceability/active';
   static const String reverseGeocode = '/serviceability/reverse-geocode';
   static const String locationAutocomplete = '/serviceability/autocomplete';
+
+  // Business & Delivery Configuration
+  static const String deliveryConfig = '/config/delivery';
+  static const String calculateDeliveryCharge = '/config/delivery/calculate-charge';
+  static const String deliveryAvailability = '/config/delivery/availability';
+  static const String launchBanner = '/config/launch-banner';
+  static const String paymentQr = '/config/payment-qr';
 
   // Notifications
   static const String userNotifications = '/notifications/user';

@@ -18,6 +18,7 @@ import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/business_config_provider.dart';
 import '../cart/cart_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/customer_live_tracking_screen.dart';
@@ -85,6 +86,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(settingsProvider.notifier).fetchSettings(),
       ref.read(subscriptionProvider.notifier).fetchSubscriptions(),
       ref.read(couponProvider.notifier).fetchCoupons(),
+      ref.read(businessConfigProvider.notifier).refreshAll(),
     ]);
   }
 
@@ -99,6 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final settingsState = ref.watch(settingsProvider);
     final subState = ref.watch(subscriptionProvider);
     final couponState = ref.watch(couponProvider);
+    final businessConfig = ref.watch(businessConfigProvider);
     final cartCount = cartState.totalItemCount;
 
     final selectedAddr = addressState.selectedAddress;
@@ -402,6 +405,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ],
                           ),
                         ),
+                      ],
+
+                      // 🚀 Customer App Launch Banner (Dynamic Admin Promotional Banner)
+                      if (businessConfig.bannerEnabled && businessConfig.bannerHeadline.isNotEmpty) ...[
+                        _buildLaunchBanner(context, businessConfig),
+                        const SizedBox(height: 14),
                       ],
 
                       // 🛵 LIVE 3D DELIVERY TRACKING BANNER (Direct Access from Home)
@@ -1259,6 +1268,127 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLaunchBanner(BuildContext context, BusinessConfigState config) {
+    Color bgColor;
+    try {
+      final hex = config.bannerBgColor.replaceAll('#', '');
+      bgColor = hex.length == 6
+          ? Color(int.parse('FF$hex', radix: 16))
+          : hex.length == 8
+              ? Color(int.parse(hex, radix: 16))
+              : const Color(0xFF1B4332);
+    } catch (_) {
+      bgColor = const Color(0xFF1B4332);
+    }
+
+    final hasImage = config.bannerImageUrl.trim().isNotEmpty;
+    final fullImageUrl = hasImage ? ApiEndpoints.resolveImageUrl(config.bannerImageUrl) : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: bgColor.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.stars_rounded,
+              size: 110,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.campaign_rounded, color: Color(0xFFE5C97A), size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'SPECIAL ANNOUNCEMENT',
+                              style: TextStyle(
+                                color: Color(0xFFE5C97A),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        config.bannerHeadline,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (config.bannerSubtitle.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          config.bannerSubtitle,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (fullImageUrl != null) ...[
+                  const SizedBox(width: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: fullImageUrl,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

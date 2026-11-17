@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/business_config_provider.dart';
 import '../profile/addresses_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../widgets/thulirva_button.dart';
@@ -339,6 +341,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
     }
 
+    final bizConfig = ref.read(businessConfigProvider);
+    if (!isPickup && !bizConfig.isDeliveryAvailable && !bizConfig.canOrder) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            bizConfig.availabilityMessage.isNotEmpty
+                ? bizConfig.availabilityMessage
+                : 'Delivery is currently unavailable. Please check our next available delivery time.',
+          ),
+          backgroundColor: AppColors.cancelled,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
     final utrText = _utrController.text.trim();
     if (utrText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -483,6 +501,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final deliveryFee = isPickup ? 0.0 : (normalSubtotal >= 299 ? 0.0 : cartState.deliveryCharge);
     final calculatedGrandTotal = normalSubtotal - cartState.discountAmount + deliveryFee;
 
+    final bizConfig = ref.read(businessConfigProvider);
+    final activeUpiId = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
+
     final payload = {
       'user_id': user?.id,
       'customer_name': contactName,
@@ -517,7 +538,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'promo_code': cartState.appliedCouponCode,
       'total': calculatedGrandTotal,
       'total_price': calculatedGrandTotal,
-      'payment_method': 'UPI QR (7904880944@superyes)',
+      'payment_method': 'UPI QR ($activeUpiId)',
       'transaction_id': utrText,
       'payment_proof': _paymentProofBase64,
       'payment_status': 'Verification Pending',
@@ -560,6 +581,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final orderState = ref.watch(orderProvider);
     final subState = ref.watch(subscriptionProvider);
     final storeSettings = ref.watch(settingsProvider);
+    final bizConfig = ref.watch(businessConfigProvider);
     final isPickupOnlyAdmin = storeSettings.isPickupOnly;
     final isPickup = isPickupOnlyAdmin || _deliveryMethod == 'pickup';
 
@@ -596,6 +618,45 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Delivery Availability / Advance Ordering Alert Banner
+                  if (!isPickup && (!bizConfig.isDeliveryAvailable || bizConfig.isAdvanceOrder)) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: bizConfig.canOrder ? const Color(0xFFEFF6FF) : const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: bizConfig.canOrder ? const Color(0xFFBFDBFE) : const Color(0xFFFECACA),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            bizConfig.canOrder ? Icons.schedule_rounded : Icons.info_outline_rounded,
+                            color: bizConfig.canOrder ? const Color(0xFF1D4ED8) : const Color(0xFFDC2626),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              bizConfig.availabilityMessage.isNotEmpty
+                                  ? bizConfig.availabilityMessage
+                                  : (bizConfig.canOrder
+                                      ? 'Advance orders active! Check your scheduled delivery slot.'
+                                      : 'Delivery is currently unavailable. Please check our next available delivery time.'),
+                              style: TextStyle(
+                                color: bizConfig.canOrder ? const Color(0xFF1E40AF) : const Color(0xFFB91C1C),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // 1. DELIVERY METHOD SELECTOR (Home Delivery vs Self Pickup)
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -1164,14 +1225,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                   color: AppColors.forestGreen,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Text(
-                                  'THULIRVA OFFICIAL MERCHANT',
-                                  style: TextStyle(color: Color(0xFFF7D97B), fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+                                child: Text(
+                                  bizConfig.merchantName.isNotEmpty
+                                      ? bizConfig.merchantName.toUpperCase()
+                                      : 'THULIRVA OFFICIAL MERCHANT',
+                                  style: const TextStyle(color: Color(0xFFF7D97B), fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.8),
                                 ),
                               ),
                               const SizedBox(height: 10),
 
-                              // Real Merchant QR Image
+                              // Real Merchant QR Image (Dynamic network or fallback)
                               Container(
                                 width: 180,
                                 height: 180,
@@ -1188,13 +1251,32 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                     ),
                                   ],
                                 ),
-                                child: Image.asset(
-                                  'assets/images/payment_qr.jpg',
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => const Center(
-                                    child: Icon(Icons.qr_code, size: 80, color: AppColors.forestGreen),
-                                  ),
-                                ),
+                                child: bizConfig.qrImageUrl.isNotEmpty
+                                    ? CachedNetworkImage(
+                                        imageUrl: ApiEndpoints.resolveImageUrl(bizConfig.qrImageUrl),
+                                        fit: BoxFit.contain,
+                                        placeholder: (_, __) => const Center(
+                                          child: SizedBox(
+                                            width: 32,
+                                            height: 32,
+                                            child: CircularProgressIndicator(color: AppColors.forestGreen, strokeWidth: 2),
+                                          ),
+                                        ),
+                                        errorWidget: (_, __, ___) => Image.asset(
+                                          'assets/images/payment_qr.jpg',
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => const Center(
+                                            child: Icon(Icons.qr_code, size: 80, color: AppColors.forestGreen),
+                                          ),
+                                        ),
+                                      )
+                                    : Image.asset(
+                                        'assets/images/payment_qr.jpg',
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, __, ___) => const Center(
+                                          child: Icon(Icons.qr_code, size: 80, color: AppColors.forestGreen),
+                                        ),
+                                      ),
                               ),
                               const SizedBox(height: 12),
 
@@ -1211,16 +1293,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Text('UPI ID: ', style: TextStyle(fontSize: 12, color: Color(0xFF555555), fontWeight: FontWeight.w600)),
-                                    const Text(
-                                      '7904880944@superyes',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
+                                    Text(
+                                      bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.forestGreen),
                                     ),
                                     const SizedBox(width: 8),
                                     GestureDetector(
                                       onTap: () {
-                                        Clipboard.setData(const ClipboardData(text: '7904880944@superyes'));
+                                        final upi = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
+                                        Clipboard.setData(ClipboardData(text: upi));
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('✓ UPI ID 7904880944@superyes copied!'), duration: Duration(seconds: 1)),
+                                          SnackBar(content: Text('✓ UPI ID $upi copied!'), duration: const Duration(seconds: 1)),
                                         );
                                       },
                                       child: Container(

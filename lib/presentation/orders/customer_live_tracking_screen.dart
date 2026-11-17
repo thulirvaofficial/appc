@@ -770,6 +770,16 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
               ),
               markers: markers,
               polylines: polylines,
+              circles: <Circle>{
+                Circle(
+                  circleId: const CircleId('customer_geofence_100m'),
+                  center: customerPos,
+                  radius: 100.0,
+                  fillColor: const Color(0x284ADE80), // Clean cream/light-green transparent fill
+                  strokeColor: const Color(0xFF22C55E), // Visible boundary
+                  strokeWidth: 2,
+                ),
+              },
               trafficEnabled: _trafficEnabled,
               myLocationEnabled: false,
               myLocationButtonEnabled: false,
@@ -1031,7 +1041,7 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Your delivery partner has reached your location and is within 100 metres. Please be ready to receive your order.',
+                  'Your Thulirva delivery partner has arrived near your location!',
                   style: TextStyle(
                     color: Color(0xFFE2E8F0),
                     fontSize: 11,

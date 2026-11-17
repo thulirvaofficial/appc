@@ -51,6 +51,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         _buildCouponCard(cartState, cartNotifier),
                         const SizedBox(height: 14),
 
+                        // Free Delivery Progress Banner (Dynamic threshold)
+                        if (cartState.deliveryChargesEnabled && !cartState.isPickupOnly) ...[
+                          _buildFreeDeliveryProgressBanner(cartState),
+                          const SizedBox(height: 14),
+                        ],
+
                         // Order Summary Card
                         _buildOrderSummaryCard(cartState),
                         const SizedBox(height: 16),
@@ -477,6 +483,65 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFreeDeliveryProgressBanner(CartState state) {
+    final isFree = state.subtotal >= state.freeDeliveryThreshold;
+    final needed = (state.freeDeliveryThreshold - state.subtotal).clamp(0.0, state.freeDeliveryThreshold);
+    final progress = state.freeDeliveryThreshold > 0
+        ? (state.subtotal / state.freeDeliveryThreshold).clamp(0.0, 1.0)
+        : 1.0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isFree ? const Color(0xFFEDF7EB) : const Color(0xFFF9FDF7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isFree ? const Color(0xFFC8E6C9) : const Color(0xFFE2EEDF),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isFree ? Icons.check_circle_rounded : Icons.local_shipping_rounded,
+                color: isFree ? const Color(0xFF2E7D32) : AppColors.forestGreen,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isFree
+                      ? 'Free Delivery unlocked on this order! 🎉'
+                      : 'Add ₹${needed.toStringAsFixed(0)} more for FREE Delivery!',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: isFree ? const Color(0xFF2E7D32) : AppColors.forestGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!isFree) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: const Color(0xFFE2EEDF),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
+                minHeight: 6,
               ),
             ),
           ],

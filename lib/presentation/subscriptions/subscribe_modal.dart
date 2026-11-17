@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/business_config_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../widgets/thulirva_button.dart';
@@ -121,6 +124,8 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
 
       final plan = _selectedPlan!;
       final totalPrice = plan.price * _quantity;
+      final bizConfig = ref.read(businessConfigProvider);
+      final activeUpiId = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
 
       final payload = {
         'user_id': user?.id,
@@ -141,7 +146,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
         'address': selectedAddr?.address ?? 'Doorstep Address, Chennai',
         'city': selectedAddr?.city ?? 'Chennai',
         'pincode': selectedAddr?.pincode ?? '600078',
-        'payment_method': 'UPI Direct Payment (7904880944@superyes)',
+        'payment_method': 'UPI Direct Payment ($activeUpiId)',
         'transaction_id': _utrController.text.trim(),
         'payment_proof': _paymentProofBase64,
       };
@@ -345,6 +350,10 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
   Widget _buildStep2Payment() {
     final plan = _selectedPlan!;
     final total = plan.price * _quantity;
+    final bizConfig = ref.watch(businessConfigProvider);
+    final activeUpiId = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
+    final merchantName = bizConfig.merchantName.isNotEmpty ? bizConfig.merchantName : 'THULIRVA ORGANICS';
+    final qrUrl = bizConfig.qrImageUrl.isNotEmpty ? ApiEndpoints.resolveImageUrl(bizConfig.qrImageUrl) : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,25 +390,60 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
                     BoxShadow(color: AppColors.forestGreen.withValues(alpha: 0.1), blurRadius: 10),
                   ],
                 ),
-                child: Image.asset(
-                  'assets/images/payment_qr.jpg',
-                  width: 170,
-                  height: 170,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.qr_code, size: 120, color: AppColors.forestGreen),
-                ),
+                child: qrUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: qrUrl,
+                        width: 170,
+                        height: 170,
+                        fit: BoxFit.contain,
+                        placeholder: (_, __) => const SizedBox(
+                          width: 170,
+                          height: 170,
+                          child: Center(
+                            child: SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: CircularProgressIndicator(color: AppColors.forestGreen, strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Image.asset(
+                          'assets/images/payment_qr.jpg',
+                          width: 170,
+                          height: 170,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.qr_code, size: 120, color: AppColors.forestGreen),
+                        ),
+                      )
+                    : Image.asset(
+                        'assets/images/payment_qr.jpg',
+                        width: 170,
+                        height: 170,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.qr_code, size: 120, color: AppColors.forestGreen),
+                      ),
               ),
               const SizedBox(height: 10),
+              Text(
+                merchantName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: AppColors.forestGreen,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('UPI ID: 7904880944@superyes', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.forestGreen)),
+                  Text('UPI ID: $activeUpiId', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.forestGreen)),
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
-                      Clipboard.setData(const ClipboardData(text: '7904880944@superyes'));
+                      Clipboard.setData(ClipboardData(text: activeUpiId));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('✓ UPI ID copied!'), duration: Duration(seconds: 1)),
+                        SnackBar(content: Text('✓ UPI ID $activeUpiId copied!'), duration: const Duration(seconds: 1)),
                       );
                     },
                     child: const Text('📋 Copy', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w800, fontSize: 12)),
