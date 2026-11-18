@@ -15,6 +15,7 @@ import 'about_screen.dart';
 import 'addresses_screen.dart';
 import 'my_profile_screen.dart';
 import 'offers_screen.dart';
+import '../support/support_tickets_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -23,35 +24,6 @@ class ProfileScreen extends ConsumerWidget {
 
   void _showSettingsDialog(BuildContext context) {
     AppSettingsDialog.show(context);
-  }
-
-  void _showHelpSupportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.forestGreen)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Contact Thulirva Customer Care:', style: TextStyle(fontWeight: FontWeight.w700)),
-            SizedBox(height: 10),
-            Text('📞 Phone: +91 79048 80944'),
-            SizedBox(height: 6),
-            Text('✉️ Email: support@thulirva.com'),
-            SizedBox(height: 6),
-            Text('⏰ Operating Hours: 6:00 AM - 9:00 PM'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -333,8 +305,13 @@ class ProfileScreen extends ConsumerWidget {
               _buildMenuItem(
                 icon: Icons.help_outline,
                 title: 'Help & Support',
-                subtitle: 'Contact support',
-                onTap: () => _showHelpSupportDialog(context),
+                subtitle: 'Customer care & support tickets',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SupportTicketsScreen()),
+                  );
+                },
               ),
               _buildMenuItem(
                 icon: Icons.info_outline,
