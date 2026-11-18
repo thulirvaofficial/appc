@@ -279,23 +279,27 @@ class SideMenuDrawer extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.headset_mic, color: AppColors.forestGreen),
             SizedBox(width: 8),
-            Text('Farm Support', style: TextStyle(color: AppColors.forestGreen, fontSize: 18)),
+            Expanded(
+              child: Text('Farm Support', style: TextStyle(color: AppColors.forestGreen, fontSize: 18), overflow: TextOverflow.ellipsis),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('📞 Phone / WhatsApp:\n+91 93606 71533', style: TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(height: 12),
-            Text('✉️ Email:\nsupport@thulirva.com', style: TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(height: 12),
-            Text('⏰ Morning Support Hours:\n5:30 AM – 8:00 PM (All 7 Days)'),
-          ],
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('📞 Phone / WhatsApp:\n+91 93606 71533', style: TextStyle(fontWeight: FontWeight.w600)),
+              SizedBox(height: 12),
+              Text('✉️ Email:\nsupport@thulirva.com', style: TextStyle(fontWeight: FontWeight.w600)),
+              SizedBox(height: 12),
+              Text('⏰ Morning Support Hours:\n5:30 AM – 8:00 PM (All 7 Days)'),
+            ],
+          ),
         ),
         actions: [
           TextButton(

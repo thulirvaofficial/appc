@@ -253,29 +253,31 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Order Assistance', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.forestGreen)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Need help with order ${_currentOrder.formattedOrderId}?', style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            const Text('Our farm dispatch team is available from 6:00 AM to 9:00 PM.'),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.phone, color: AppColors.forestGreen),
-              title: const Text('+91 79048 80944', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-              trailing: const Icon(Icons.copy, size: 16),
-              onTap: () => IdFormatter.copyToClipboard(context, '+917904880944', label: 'Support Phone'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.email, color: AppColors.forestGreen),
-              title: const Text('support@thulirva.com', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-              trailing: const Icon(Icons.copy, size: 16),
-              onTap: () => IdFormatter.copyToClipboard(context, 'support@thulirva.com', label: 'Support Email'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Need help with order ${_currentOrder.formattedOrderId}?', style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              const Text('Our farm dispatch team is available from 6:00 AM to 9:00 PM.'),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phone, color: AppColors.forestGreen),
+                title: const Text('+91 79048 80944', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                trailing: const Icon(Icons.copy, size: 16),
+                onTap: () => IdFormatter.copyToClipboard(context, '+917904880944', label: 'Support Phone'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.email, color: AppColors.forestGreen),
+                title: const Text('support@thulirva.com', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                trailing: const Icon(Icons.copy, size: 16),
+                onTap: () => IdFormatter.copyToClipboard(context, 'support@thulirva.com', label: 'Support Email'),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -798,15 +800,20 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.report_problem_outlined, color: Color(0xFFD97706), size: 22),
-                        SizedBox(width: 8),
-                        Text(
-                          'Report Delivery Issue',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textDark),
-                        ),
-                      ],
+                    Expanded(
+                      child: Row(
+                        children: const [
+                          Icon(Icons.report_problem_outlined, color: Color(0xFFD97706), size: 22),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Report Delivery Issue',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textDark),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close_rounded),

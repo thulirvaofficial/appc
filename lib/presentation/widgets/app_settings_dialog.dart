@@ -150,78 +150,83 @@ class _AppSettingsDialogState extends State<AppSettingsDialog> with WidgetsBindi
               height: 120,
               child: Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
             )
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Push Notifications Toggle
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: effectivePushActive ? const Color(0xFFFAF7EE) : const Color(0xFFF7F7F7),
-                  ),
-                  child: SwitchListTile(
-                    title: const Text(
-                      'Push Notifications',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+          : SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 1. Push Notifications Toggle
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: effectivePushActive ? const Color(0xFFFAF7EE) : const Color(0xFFF7F7F7),
                     ),
-                    subtitle: Text(
-                      !_osPermissionGranted
-                          ? 'Blocked by phone settings • Tap to configure'
-                          : (_pushNotificationsPref
-                              ? 'Alerts active (Orders, Subscriptions, Payments)'
-                              : 'Alerts muted by customer'),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: !_osPermissionGranted
-                            ? Colors.red.shade700
-                            : (_pushNotificationsPref ? const Color(0xFF4A6B53) : Colors.grey.shade600),
-                        fontWeight: !_osPermissionGranted ? FontWeight.w600 : FontWeight.normal,
+                    child: SwitchListTile(
+                      title: const Text(
+                        'Push Notifications',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                      ),
+                      subtitle: Text(
+                        !_osPermissionGranted
+                            ? 'Blocked by phone settings • Tap to configure'
+                            : (_pushNotificationsPref
+                                ? 'Alerts active (Orders, Subscriptions, Payments)'
+                                : 'Alerts muted by customer'),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: !_osPermissionGranted
+                              ? Colors.red.shade700
+                              : (_pushNotificationsPref ? const Color(0xFF4A6B53) : Colors.grey.shade600),
+                          fontWeight: !_osPermissionGranted ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      value: effectivePushActive,
+                      activeThumbColor: AppColors.forestGreen,
+                      onChanged: (val) => _handlePushToggle(val),
+                    ),
+                  ),
+                  if (!_osPermissionGranted) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => NotificationPermissionService.openSettings(),
+                        icon: const Icon(Icons.settings, size: 14, color: AppColors.forestGreen),
+                        label: const Flexible(
+                          child: Text(
+                            'Open Device Notification Settings',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ),
                     ),
-                    value: effectivePushActive,
-                    activeThumbColor: AppColors.forestGreen,
-                    onChanged: (val) => _handlePushToggle(val),
-                  ),
-                ),
-                if (!_osPermissionGranted) ...[
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => NotificationPermissionService.openSettings(),
-                      icon: const Icon(Icons.settings, size: 14, color: AppColors.forestGreen),
-                      label: const Text(
-                        'Open Device Notification Settings',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
+                  ],
+                  const SizedBox(height: 12),
+
+                  // 2. Early Morning Reminders Toggle
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: _morningReminderPref ? const Color(0xFFFAF7EE) : const Color(0xFFF7F7F7),
+                    ),
+                    child: SwitchListTile(
+                      title: const Text(
+                        'Early Morning Reminders',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
                       ),
+                      subtitle: const Text(
+                        '5:30 AM daily milk dispatch alert with sound & vibration',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF4A6B53)),
+                      ),
+                      value: _morningReminderPref,
+                      activeThumbColor: AppColors.forestGreen,
+                      onChanged: (val) => _handleMorningReminderToggle(val),
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
-
-                // 2. Early Morning Reminders Toggle
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: _morningReminderPref ? const Color(0xFFFAF7EE) : const Color(0xFFF7F7F7),
-                  ),
-                  child: SwitchListTile(
-                    title: const Text(
-                      'Early Morning Reminders',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.forestGreen),
-                    ),
-                    subtitle: const Text(
-                      '5:30 AM daily milk dispatch alert with sound & vibration',
-                      style: TextStyle(fontSize: 11.5, color: Color(0xFF4A6B53)),
-                    ),
-                    value: _morningReminderPref,
-                    activeThumbColor: AppColors.forestGreen,
-                    onChanged: (val) => _handleMorningReminderToggle(val),
-                  ),
-                ),
-              ],
+              ),
             ),
       actions: [
         TextButton(

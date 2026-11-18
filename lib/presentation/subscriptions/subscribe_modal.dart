@@ -187,30 +187,38 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
       _selectedPlan = plans.first;
     }
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _currentStep == 1 ? 'Start Farm Subscription' : 'Step 2: UPI Payment',
-                style: AppTypography.titleLarge.copyWith(color: AppColors.forestGreen),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
+    final viewInsets = MediaQuery.of(context).viewInsets;
+    return Padding(
+      padding: EdgeInsets.only(bottom: viewInsets.bottom),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    _currentStep == 1 ? 'Start Farm Subscription' : 'Step 2: UPI Payment',
+                    style: AppTypography.titleLarge.copyWith(color: AppColors.forestGreen),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
           const Divider(),
 
           Expanded(
@@ -241,8 +249,9 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildStep1Plans(List<SubscriptionPlanModel> plans) {
     return Column(
@@ -434,11 +443,13 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
                 ),
               ),
               const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
                 children: [
                   Text('UPI ID: $activeUpiId', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.forestGreen)),
-                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: activeUpiId));
@@ -480,18 +491,26 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.receipt_long, size: 18, color: AppColors.forestGreen),
-                      SizedBox(width: 8),
-                      Text(
-                        'Attach Payment Screenshot',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textDark),
-                      ),
-                    ],
+                  Expanded(
+                    child: Row(
+                      children: const [
+                        Icon(Icons.receipt_long, size: 18, color: AppColors.forestGreen),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Attach Payment Screenshot',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textDark),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   if (_paymentProofFile != null)
-                    const Text('✓ Attached', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w800, fontSize: 11)),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Text('✓ Attached', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w800, fontSize: 11)),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),

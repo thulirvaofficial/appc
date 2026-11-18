@@ -473,7 +473,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               children: const [
                 Icon(Icons.check_circle, color: AppColors.forestGreen, size: 26),
                 SizedBox(width: 8),
-                Text('Subscription Placed!', style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w800, fontSize: 18)),
+                Expanded(
+                  child: Text(
+                    'Subscription Placed!',
+                    style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w800, fontSize: 18),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             content: const Text(
