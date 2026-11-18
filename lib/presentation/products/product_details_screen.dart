@@ -243,6 +243,153 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                             _buildFeatureBadge('💪', 'Rich in Protein'),
                           ],
                         ),
+                        const SizedBox(height: 24),
+
+                        // Key Highlights
+                        if (p.highlights.isNotEmpty) ...[
+                          const Text(
+                            'Key Highlights',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ...p.highlights.map((h) => Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('🌱 ', style: TextStyle(fontSize: 13)),
+                                    Expanded(
+                                      child: Text(
+                                        h,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textMid,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Ingredients
+                        if (p.ingredients.isNotEmpty) ...[
+                          const Text(
+                            'Pure Ingredients',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.lightCream,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              p.ingredients.join(', '),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textDark,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Storage & Usage Instructions
+                        if (p.storageInstructions.isNotEmpty || p.usageInstructions.isNotEmpty) ...[
+                          const Text(
+                            'Storage & Usage',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (p.storageInstructions.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                '❄️ Storage: ${p.storageInstructions}',
+                                style: const TextStyle(fontSize: 12.5, color: AppColors.textMid, height: 1.4),
+                              ),
+                            ),
+                          if (p.usageInstructions.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                '💡 Usage: ${p.usageInstructions}',
+                                style: const TextStyle(fontSize: 12.5, color: AppColors.textMid, height: 1.4),
+                              ),
+                            ),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Product-Specific Refund & Quality Policy Card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF86EFAC)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.verified_user_outlined, color: AppColors.forestGreen, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    p.refundPolicy != null
+                                        ? '${p.refundPolicy!['type'] ?? 'Quality Assurance'}'
+                                        : 'THULIRVA Farm Purity Guarantee',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: AppColors.forestGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                p.refundPolicy != null
+                                    ? '${p.refundPolicy!['condition'] ?? '100% refund or replacement if not satisfied upon delivery.'}'
+                                    : 'Instant replacement or 100% wallet refund if milk or produce arrives damaged or compromised upon delivery inspection.',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF166534),
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (p.refundPolicy != null && p.refundPolicy!['window_hours'] != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '⏱ Claim window: within ${p.refundPolicy!['window_hours']} hours of delivery',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),

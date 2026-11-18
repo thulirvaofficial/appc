@@ -73,6 +73,14 @@ class ProductModel {
   final String? description;
   final String status;
   final List<ProductVariantModel> variants;
+  final List<String> highlights;
+  final List<String> ingredients;
+  final Map<String, dynamic>? nutritionalInfo;
+  final String storageInstructions;
+  final String usageInstructions;
+  final Map<String, dynamic>? refundPolicy;
+  final String shelfLife;
+  final String certification;
 
   ProductModel({
     required this.id,
@@ -89,6 +97,14 @@ class ProductModel {
     this.description,
     this.status = 'active',
     this.variants = const [],
+    this.highlights = const [],
+    this.ingredients = const [],
+    this.nutritionalInfo,
+    this.storageInstructions = '',
+    this.usageInstructions = '',
+    this.refundPolicy,
+    this.shelfLife = '',
+    this.certification = '',
   });
 
   ProductVariantModel? get defaultVariant {
@@ -119,6 +135,21 @@ class ProductModel {
       parsedVariants = _generateDefaultVariants(parsedId, parsedName, parsedPrice, parsedWeight);
     }
 
+    final List<String> parsedHighlights = (json['highlights'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const [];
+    final List<String> parsedIngredients = (json['ingredients'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const [];
+    final Map<String, dynamic>? parsedNutrition = json['nutritional_info'] is Map
+        ? Map<String, dynamic>.from(json['nutritional_info'] as Map)
+        : null;
+    final Map<String, dynamic>? parsedRefund = json['refund_policy'] is Map
+        ? Map<String, dynamic>.from(json['refund_policy'] as Map)
+        : null;
+
     return ProductModel(
       id: parsedId,
       name: parsedName,
@@ -134,6 +165,14 @@ class ProductModel {
       description: json['description']?.toString(),
       status: (json['status'] ?? 'active').toString(),
       variants: parsedVariants,
+      highlights: parsedHighlights,
+      ingredients: parsedIngredients,
+      nutritionalInfo: parsedNutrition,
+      storageInstructions: (json['storage_instructions'] ?? '').toString(),
+      usageInstructions: (json['usage_instructions'] ?? '').toString(),
+      refundPolicy: parsedRefund,
+      shelfLife: (json['shelf_life'] ?? '').toString(),
+      certification: (json['certification'] ?? '').toString(),
     );
   }
 
