@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/id_formatter.dart';
 import '../../providers/auth_provider.dart';
@@ -128,15 +130,44 @@ class ProfileScreen extends ConsumerWidget {
                                   ),
                                 ],
                               ),
-                              child: Center(
-                                child: Text(
-                                  initial,
-                                  style: const TextStyle(
-                                    color: AppColors.forestGreen,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
+                              child: ClipOval(
+                                child: (user?.profilePhoto != null && user!.profilePhoto!.trim().isNotEmpty)
+                                    ? CachedNetworkImage(
+                                        imageUrl: ApiEndpoints.resolveImageUrl(user.profilePhoto!),
+                                        fit: BoxFit.cover,
+                                        width: 58,
+                                        height: 58,
+                                        placeholder: (_, __) => const Center(
+                                          child: SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.forestGreen,
+                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (_, __, ___) => Center(
+                                          child: Text(
+                                            initial,
+                                            style: const TextStyle(
+                                              color: AppColors.forestGreen,
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Center(
+                                        child: Text(
+                                          initial,
+                                          style: const TextStyle(
+                                            color: AppColors.forestGreen,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(width: 14),

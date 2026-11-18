@@ -31,12 +31,13 @@ class BusinessConfigState {
   // Master Cash on Delivery (COD) Switch
   final bool codEnabled;
 
-  // Dynamic Launch Banner
+  // Dynamic Launch Banner & Announcements Carousel
   final bool bannerEnabled;
   final String bannerHeadline;
   final String bannerSubtitle;
   final String bannerBgColor;
   final String bannerImageUrl;
+  final List<Map<String, dynamic>> announcements;
 
   final bool isLoading;
 
@@ -65,6 +66,7 @@ class BusinessConfigState {
     this.bannerSubtitle = '',
     this.bannerBgColor = '#1B4332',
     this.bannerImageUrl = '',
+    this.announcements = const [],
     this.isLoading = false,
   });
 
@@ -102,6 +104,7 @@ class BusinessConfigState {
     String? bannerSubtitle,
     String? bannerBgColor,
     String? bannerImageUrl,
+    List<Map<String, dynamic>>? announcements,
     bool? isLoading,
   }) {
     return BusinessConfigState(
@@ -129,6 +132,7 @@ class BusinessConfigState {
       bannerSubtitle: bannerSubtitle ?? this.bannerSubtitle,
       bannerBgColor: bannerBgColor ?? this.bannerBgColor,
       bannerImageUrl: bannerImageUrl ?? this.bannerImageUrl,
+      announcements: announcements ?? this.announcements,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -228,7 +232,18 @@ class BusinessConfigNotifier extends StateNotifier<BusinessConfigState> {
     try {
       final api = ref.read(apiClientProvider);
       final res = await api.get(ApiEndpoints.launchBanner);
+      List<Map<String, dynamic>> eligibleAnnouncements = [];
+
       if (res.data != null && res.data['success'] == true) {
+        if (res.data['announcements'] is List) {
+          final rawList = res.data['announcements'] as List;
+          eligibleAnnouncements = rawList
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .where((a) => a['is_active'] != false && a['is_published'] != false)
+              .toList();
+        }
+
         final b = res.data['banner'] as Map<String, dynamic>?;
         if (b != null && b['enabled'] == true) {
           state = state.copyWith(
@@ -237,15 +252,31 @@ class BusinessConfigNotifier extends StateNotifier<BusinessConfigState> {
             bannerSubtitle: b['subtitle'] ?? '',
             bannerBgColor: b['bg_color'] ?? b['background_color'] ?? '#1B4332',
             bannerImageUrl: b['image_url'] ?? '',
+            announcements: eligibleAnnouncements,
+          );
+          return;
+        }
+
+        if (eligibleAnnouncements.isNotEmpty) {
+          final first = eligibleAnnouncements.first;
+          state = state.copyWith(
+            bannerEnabled: true,
+            bannerHeadline: first['title'] ?? '',
+            bannerSubtitle: first['description'] ?? '',
+            bannerBgColor: first['bg_color'] ?? '#1B4332',
+            bannerImageUrl: first['image_url'] ?? '',
+            announcements: eligibleAnnouncements,
           );
           return;
         }
       }
+
       state = state.copyWith(
         bannerEnabled: false,
         bannerHeadline: '',
         bannerSubtitle: '',
         bannerImageUrl: '',
+        announcements: [],
       );
     } catch (e) {
       debugPrint('[BusinessConfig] Error fetching launch banner: $e');
@@ -254,6 +285,7 @@ class BusinessConfigNotifier extends StateNotifier<BusinessConfigState> {
         bannerHeadline: '',
         bannerSubtitle: '',
         bannerImageUrl: '',
+        announcements: [],
       );
     }
   }

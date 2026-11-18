@@ -29,20 +29,28 @@ class ApiEndpoints {
     if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
       final uri = Uri.tryParse(cleanPath);
       if (uri != null && uri.path.startsWith('/uploads/')) {
-        return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}/api${uri.path}';
+        final q = uri.hasQuery ? '?${uri.query}' : '';
+        return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}/api${uri.path}$q';
       }
       return cleanPath;
+    }
+
+    String query = '';
+    if (cleanPath.contains('?')) {
+      final parts = cleanPath.split('?');
+      cleanPath = parts[0];
+      query = '?${parts.sublist(1).join('?')}';
     }
 
     if (!cleanPath.startsWith('/')) cleanPath = '/$cleanPath';
 
     if (cleanPath.startsWith('/uploads/')) {
-      return '$serverRoot/api$cleanPath';
+      return '$serverRoot/api$cleanPath$query';
     }
     if (cleanPath.startsWith('/api/uploads/')) {
-      return '$serverRoot$cleanPath';
+      return '$serverRoot$cleanPath$query';
     }
-    return '$serverRoot$cleanPath';
+    return '$serverRoot$cleanPath$query';
   }
 
   // Returns ordered list of candidate URLs for multi-host image loading
@@ -51,6 +59,13 @@ class ApiEndpoints {
     if (path.startsWith('data:image/')) return [path];
 
     String cleanPath = path.replaceAll(r'\', '/').trim();
+    String query = '';
+    if (cleanPath.contains('?')) {
+      final parts = cleanPath.split('?');
+      cleanPath = parts[0];
+      query = '?${parts.sublist(1).join('?')}';
+    }
+
     if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
       final uri = Uri.tryParse(cleanPath);
       if (uri != null) {
@@ -63,9 +78,9 @@ class ApiEndpoints {
 
     // Priority 1: Express endpoint via /api/uploads/
     if (cleanPath.startsWith('/uploads/')) {
-      candidates.add('$serverRoot/api$cleanPath');
+      candidates.add('$serverRoot/api$cleanPath$query');
     } else if (cleanPath.startsWith('/api/uploads/')) {
-      candidates.add('$serverRoot$cleanPath');
+      candidates.add('$serverRoot$cleanPath$query');
     }
 
     final hostList = [
@@ -79,17 +94,17 @@ class ApiEndpoints {
     for (final host in hostList) {
       final cleanHost = host.replaceAll(RegExp(r'/api/?$'), '');
       if (cleanPath.startsWith('/uploads/')) {
-        final apiVariant = '$cleanHost/api$cleanPath';
+        final apiVariant = '$cleanHost/api$cleanPath$query';
         if (!candidates.contains(apiVariant)) {
           candidates.add(apiVariant);
         }
       } else if (cleanPath.startsWith('/api/uploads/')) {
-        final apiVariant = '$cleanHost$cleanPath';
+        final apiVariant = '$cleanHost$cleanPath$query';
         if (!candidates.contains(apiVariant)) {
           candidates.add(apiVariant);
         }
       }
-      final url = '$cleanHost$cleanPath';
+      final url = '$cleanHost$cleanPath$query';
       if (!candidates.contains(url)) {
         candidates.add(url);
       }
@@ -149,6 +164,7 @@ class ApiEndpoints {
   static const String calculateDeliveryCharge = '/config/delivery/calculate-charge';
   static const String deliveryAvailability = '/config/delivery/availability';
   static const String launchBanner = '/config/launch-banner';
+  static const String activeAnnouncements = '/announcements/active';
   static const String paymentQr = '/config/payment-qr';
 
   // Notifications
