@@ -48,17 +48,21 @@ class CategoryNotifier extends StateNotifier<CategoryState> {
       if (data is Map && data['success'] == true && data['categories'] != null) {
         final list = (data['categories'] as List)
             .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+            .where((c) => c.isActive)
             .toList();
+        list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
         state = state.copyWith(categories: list, isLoading: false);
       } else if (data is List) {
         final list = data
             .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+            .where((c) => c.isActive)
             .toList();
+        list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
         state = state.copyWith(categories: list, isLoading: false);
       } else {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: 'No categories received',
+          errorMessage: 'No categories received from server',
         );
       }
     } catch (e) {

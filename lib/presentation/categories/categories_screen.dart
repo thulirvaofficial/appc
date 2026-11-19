@@ -7,62 +7,28 @@ import '../products/products_list_screen.dart';
 import '../widgets/category_card.dart';
 import '../widgets/thulirva_app_bar.dart';
 
-class CategoriesScreen extends ConsumerWidget {
+class CategoriesScreen extends ConsumerStatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
 
   const CategoriesScreen({super.key, this.onNavigateToTab});
 
-  // Default primary 7 categories matching the reference design exactly
-  static final List<CategoryModel> _defaultCategories = [
-    CategoryModel(
-      id: 'fresh_cow_milk',
-      name: 'Fresh Cow Milk',
-      displayName: 'Fresh Cow Milk',
-      description: 'Farm fresh A2 raw & chilled cow milk from our farms',
-    ),
-    CategoryModel(
-      id: 'ghee_butter',
-      name: 'Ghee & Butter',
-      displayName: 'Ghee & Butter',
-      description: 'Traditional hand-churned Bilona ghee and fresh butter',
-    ),
-    CategoryModel(
-      id: 'paneer_tofu',
-      name: 'Paneer & Tofu',
-      displayName: 'Paneer & Tofu',
-      description: 'Soft, melt-in-mouth cottage cheese and protein-rich tofu',
-    ),
-    CategoryModel(
-      id: 'natural_set_curd',
-      name: 'Natural Set Curd',
-      displayName: 'Natural Set Curd',
-      description: 'Naturally cultured probiotic thick curd for a healthy gut',
-    ),
-    CategoryModel(
-      id: 'cold_pressed_oils',
-      name: 'Cold-Pressed Oils',
-      displayName: 'Cold-Pressed Oils',
-      description: 'Traditional wooden chekku cold-pressed oils, unrefined & pure',
-    ),
-    CategoryModel(
-      id: 'pure_spices_masalas',
-      name: 'Pure Spices & Masalas',
-      displayName: 'Pure Spices & Masalas',
-      description: 'Single-origin Salem turmeric, spices and authentic masalas',
-    ),
-    CategoryModel(
-      id: 'vegan_plant_based',
-      name: 'Vegan & Plant-Based',
-      displayName: 'Vegan & Plant-Based',
-      description: 'Nutritious dairy-free and plant-based alternatives',
-    ),
-  ];
+  @override
+  ConsumerState<CategoriesScreen> createState() => _CategoriesScreenState();
+}
+
+class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(categoryProvider.notifier).fetchCategories();
+    });
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final categoryState = ref.watch(categoryProvider);
-    final categoriesToDisplay =
-        categoryState.categories.isNotEmpty ? categoryState.categories : _defaultCategories;
+    final categories = categoryState.categories;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7EE),
@@ -83,41 +49,133 @@ class CategoriesScreen extends ConsumerWidget {
         child: RefreshIndicator(
           color: AppColors.forestGreen,
           onRefresh: () => ref.read(categoryProvider.notifier).fetchCategories(),
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            children: [
-              // Header title & subtitle
-              const Center(
-                child: Text(
-                  'Categories',
-                  style: TextStyle(
-                    color: AppColors.forestGreen,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Center(
-                child: Text(
-                  'Explore our fresh & natural product ranges',
-                  style: TextStyle(
-                    color: Color(0xFF556B5D),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Category Cards List
-              ...categoriesToDisplay.map((cat) => CategoryCard(category: cat)),
-              const SizedBox(height: 16),
-            ],
-          ),
+          child: _buildBody(categoryState, categories),
         ),
       ),
+    );
+  }
+
+  Widget _buildBody(CategoryState state, List<CategoryModel> categories) {
+    // 1. Loading state with no cached categories
+    if (state.isLoading && categories.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.forestGreen,
+          strokeWidth: 2.5,
+        ),
+      );
+    }
+
+    // 2. Error state with no cached categories
+    if (state.errorMessage != null && categories.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 60),
+          const Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.textMuted),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'Unable to load categories',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              state.errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: () => ref.read(categoryProvider.notifier).fetchCategories(),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.forestGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 3. Empty state
+    if (categories.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 80),
+          const Center(
+            child: Text('🌾', style: TextStyle(fontSize: 48)),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'No categories found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Center(
+            child: Text(
+              'Please check back later or pull down to refresh.',
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 4. Dynamic Categories List
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      children: [
+        const Center(
+          child: Text(
+            'Categories',
+            style: TextStyle(
+              color: AppColors.forestGreen,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Center(
+          child: Text(
+            'Explore our fresh & natural product ranges',
+            style: TextStyle(
+              color: Color(0xFF556B5D),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Dynamic category cards loaded directly from centralized backend
+        ...categories.map((cat) => CategoryCard(category: cat)),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

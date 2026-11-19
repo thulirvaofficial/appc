@@ -14,102 +14,11 @@ class CategoryCard extends StatelessWidget {
     this.onTap,
   });
 
-  // Map category names to reference assets, icons, and descriptions
-  static final Map<String, _CatMeta> _metaMap = {
-    'milk': _CatMeta(
-      asset: 'assets/images/cat_fresh_milk.png',
-      icon: Icons.local_drink_outlined,
-      defaultDesc: 'Farm fresh A2 raw & chilled cow milk from our farms',
-    ),
-    'cow milk': _CatMeta(
-      asset: 'assets/images/cat_fresh_milk.png',
-      icon: Icons.local_drink_outlined,
-      defaultDesc: 'Farm fresh A2 raw & chilled cow milk from our farms',
-    ),
-    'fresh cow milk': _CatMeta(
-      asset: 'assets/images/cat_fresh_milk.png',
-      icon: Icons.local_drink_outlined,
-      defaultDesc: 'Farm fresh A2 raw & chilled cow milk from our farms',
-    ),
-    'ghee': _CatMeta(
-      asset: 'assets/images/cat_ghee_butter.png',
-      icon: Icons.soup_kitchen_outlined,
-      defaultDesc: 'Traditional hand-churned Bilona ghee and fresh butter',
-    ),
-    'ghee & butter': _CatMeta(
-      asset: 'assets/images/cat_ghee_butter.png',
-      icon: Icons.soup_kitchen_outlined,
-      defaultDesc: 'Traditional hand-churned Bilona ghee and fresh butter',
-    ),
-    'paneer': _CatMeta(
-      asset: 'assets/images/cat_paneer_tofu.png',
-      icon: Icons.bakery_dining_outlined,
-      defaultDesc: 'Soft, melt-in-mouth cottage cheese and protein-rich tofu',
-    ),
-    'paneer & tofu': _CatMeta(
-      asset: 'assets/images/cat_paneer_tofu.png',
-      icon: Icons.bakery_dining_outlined,
-      defaultDesc: 'Soft, melt-in-mouth cottage cheese and protein-rich tofu',
-    ),
-    'curd': _CatMeta(
-      asset: 'assets/images/cat_set_curd.png',
-      icon: Icons.rice_bowl_outlined,
-      defaultDesc: 'Naturally cultured probiotic thick curd for a healthy gut',
-    ),
-    'natural set curd': _CatMeta(
-      asset: 'assets/images/cat_set_curd.png',
-      icon: Icons.rice_bowl_outlined,
-      defaultDesc: 'Naturally cultured probiotic thick curd for a healthy gut',
-    ),
-    'oils': _CatMeta(
-      asset: 'assets/images/cat_cold_pressed_oils.png',
-      icon: Icons.water_drop_outlined,
-      defaultDesc: 'Traditional wooden chekku cold-pressed oils, unrefined & pure',
-    ),
-    'cold-pressed oils': _CatMeta(
-      asset: 'assets/images/cat_cold_pressed_oils.png',
-      icon: Icons.water_drop_outlined,
-      defaultDesc: 'Traditional wooden chekku cold-pressed oils, unrefined & pure',
-    ),
-    'spices': _CatMeta(
-      asset: 'assets/images/cat_spices_masalas.png',
-      icon: Icons.science_outlined,
-      defaultDesc: 'Single-origin Salem turmeric, spices and authentic masalas',
-    ),
-    'pure spices & masalas': _CatMeta(
-      asset: 'assets/images/cat_spices_masalas.png',
-      icon: Icons.science_outlined,
-      defaultDesc: 'Single-origin Salem turmeric, spices and authentic masalas',
-    ),
-    'vegan': _CatMeta(
-      asset: 'assets/images/cat_vegan_plant.png',
-      icon: Icons.eco_outlined,
-      defaultDesc: 'Nutritious dairy-free and plant-based alternatives',
-    ),
-    'vegan & plant-based': _CatMeta(
-      asset: 'assets/images/cat_vegan_plant.png',
-      icon: Icons.eco_outlined,
-      defaultDesc: 'Nutritious dairy-free and plant-based alternatives',
-    ),
-  };
-
-  _CatMeta? _findMeta() {
-    final lowerName = category.name.trim().toLowerCase();
-    for (final entry in _metaMap.entries) {
-      if (lowerName.contains(entry.key) || entry.key.contains(lowerName)) {
-        return entry.value;
-      }
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final meta = _findMeta();
     final displayName = category.displayName.isNotEmpty ? category.displayName : category.name;
-    final description = (category.description != null && category.description!.isNotEmpty)
-        ? category.description!
-        : (meta?.defaultDesc ?? 'Pure farm fresh ${category.name.toLowerCase()} products');
+    final hasDescription = category.description != null && category.description!.trim().isNotEmpty;
+    final description = hasDescription ? category.description!.trim() : null;
 
     return GestureDetector(
       onTap: onTap ??
@@ -140,29 +49,37 @@ class CategoryCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Photo Thumbnail (Left)
+              // Photo Thumbnail (Left, 96px width)
               SizedBox(
                 width: 96,
-                height: 82,
-                child: _buildPhoto(meta),
+                child: _buildPhoto(),
               ),
 
-              // Title & Description (Center)
+              // Title & Optional Dynamic Description (Center)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // Category Title Row with Icon/Emoji
                       Row(
                         children: [
-                          Icon(
-                            meta?.icon ?? Icons.eco_outlined,
-                            size: 16,
-                            color: AppColors.forestGreen,
-                          ),
-                          const SizedBox(width: 6),
+                          if (category.categoryIcon != null && category.categoryIcon!.isNotEmpty) ...[
+                            Text(
+                              category.categoryIcon!,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                            const SizedBox(width: 6),
+                          ] else ...[
+                            const Icon(
+                              Icons.eco_outlined,
+                              size: 16,
+                              color: AppColors.forestGreen,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           Expanded(
                             child: Text(
                               displayName,
@@ -178,17 +95,22 @@ class CategoryCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          color: Color(0xFF637868),
-                          fontSize: 11.5,
-                          height: 1.3,
+
+                      // Dynamic Description: ONLY rendered when non-null and non-empty from backend.
+                      // Never displays default/marketing text when absent, adjusting layout naturally.
+                      if (hasDescription && description != null) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            color: Color(0xFF637868),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -220,58 +142,33 @@ class CategoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPhoto(_CatMeta? meta) {
-    if (category.mobileImage != null && category.mobileImage!.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: category.mobileImageUrl,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => Container(
-          color: const Color(0xFFF3F7F2),
-          child: const Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
-            ),
+  Widget _buildPhoto() {
+    return CachedNetworkImage(
+      imageUrl: category.mobileImageUrl,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => Container(
+        color: const Color(0xFFF3F7F2),
+        child: const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
           ),
         ),
-        errorWidget: (_, __, ___) => (meta?.asset != null)
-            ? Image.asset(
-                meta!.asset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _fallbackPhoto(),
-              )
-            : _fallbackPhoto(),
-      );
-    }
-    if (meta?.asset != null) {
-      return Image.asset(
-        meta!.asset,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackPhoto(),
-      );
-    }
-    return _fallbackPhoto();
+      ),
+      errorWidget: (_, __, ___) => _fallbackPhoto(),
+    );
   }
 
   Widget _fallbackPhoto() {
     return Container(
       color: const Color(0xFFF0F6EE),
-      child: const Center(
-        child: Icon(Icons.eco, color: AppColors.forestGreen, size: 28),
+      child: Center(
+        child: Text(
+          category.categoryIcon ?? category.emoji ?? '🌿',
+          style: const TextStyle(fontSize: 28),
+        ),
       ),
     );
   }
-}
-
-class _CatMeta {
-  final String asset;
-  final IconData icon;
-  final String defaultDesc;
-
-  const _CatMeta({
-    required this.asset,
-    required this.icon,
-    required this.defaultDesc,
-  });
 }
