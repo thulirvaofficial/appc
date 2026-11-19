@@ -71,16 +71,21 @@ class ProductModel {
   final String? emoji;
   final String? image;
   final String? description;
+  final String? shortDescription;
   final String status;
   final List<ProductVariantModel> variants;
+  final List<dynamic> featureBadges;
   final List<String> highlights;
   final List<String> ingredients;
+  final bool ingredientsEnabled;
   final Map<String, dynamic>? nutritionalInfo;
   final String storageInstructions;
   final String usageInstructions;
   final Map<String, dynamic>? refundPolicy;
   final String shelfLife;
   final String certification;
+  final String? seoTitle;
+  final String? seoDescription;
 
   ProductModel({
     required this.id,
@@ -95,16 +100,21 @@ class ProductModel {
     this.emoji,
     this.image,
     this.description,
+    this.shortDescription,
     this.status = 'active',
     this.variants = const [],
+    this.featureBadges = const [],
     this.highlights = const [],
     this.ingredients = const [],
+    this.ingredientsEnabled = true,
     this.nutritionalInfo,
     this.storageInstructions = '',
     this.usageInstructions = '',
     this.refundPolicy,
     this.shelfLife = '',
     this.certification = '',
+    this.seoTitle,
+    this.seoDescription,
   });
 
   ProductVariantModel? get defaultVariant {
@@ -163,16 +173,25 @@ class ProductModel {
       emoji: json['emoji']?.toString() ?? '🥛',
       image: json['image']?.toString() ?? json['image_url']?.toString(),
       description: json['description']?.toString(),
+      shortDescription: json['short_description']?.toString(),
       status: (json['status'] ?? 'active').toString(),
       variants: parsedVariants,
+      featureBadges: (json['feature_badges'] is List)
+          ? List<dynamic>.from(json['feature_badges'] as List)
+          : (json['features'] is List
+              ? (json['features'] as List).map((f) => {'icon': '🌿', 'text': f.toString(), 'enabled': true}).toList()
+              : const []),
       highlights: parsedHighlights,
       ingredients: parsedIngredients,
+      ingredientsEnabled: json['ingredients_enabled'] != false,
       nutritionalInfo: parsedNutrition,
-      storageInstructions: (json['storage_instructions'] ?? '').toString(),
-      usageInstructions: (json['usage_instructions'] ?? '').toString(),
+      storageInstructions: (json['storage_instructions'] ?? json['storage'] ?? '').toString(),
+      usageInstructions: (json['usage_instructions'] ?? json['usage'] ?? '').toString(),
       refundPolicy: parsedRefund,
       shelfLife: (json['shelf_life'] ?? '').toString(),
       certification: (json['certification'] ?? '').toString(),
+      seoTitle: json['seo_title']?.toString(),
+      seoDescription: json['seo_description']?.toString(),
     );
   }
 

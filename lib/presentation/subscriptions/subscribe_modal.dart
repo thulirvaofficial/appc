@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/utils/safe_parse_util.dart';
 import '../../data/models/subscription_model.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -85,16 +86,33 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
   void initState() {
     super.initState();
     _selectedPlan = widget.initialPlan;
+    if (_selectedPlan != null) {
+      _applyPlanDefaults(_selectedPlan!);
+    }
   }
 
-  final List<String> _slots = [
-    'Morning: 5:30 AM - 6:30 AM',
-    'Morning: 6:00 AM - 7:00 AM',
-    'Morning: 7:00 AM - 8:00 AM',
-    'Evening: 5:00 PM - 6:00 PM',
-    'Evening: 6:00 PM - 7:00 PM',
-    'Both Morning & Evening',
-  ];
+  void _applyPlanDefaults(SubscriptionPlanModel plan) {
+    _quantity = plan.isQuantityEnabled ? plan.defaultQuantity : plan.defaultQuantity;
+    final slots = plan.availableSlots;
+    if (slots.isNotEmpty && !slots.contains(_selectedSlot)) {
+      _selectedSlot = slots.first;
+    }
+    final minNotice = plan.minNoticeHours;
+    _startDate = DateTime.now().add(Duration(hours: minNotice > 0 ? minNotice : 12));
+  }
+
+  double get _calculatedTotalPrice {
+    if (_selectedPlan == null) return 0;
+    final plan = _selectedPlan!;
+    final basePrice = SafeParseUtil.toDouble(plan.pricingConfig?['base_price_per_delivery']) > 0
+        ? SafeParseUtil.toDouble(plan.pricingConfig!['base_price_per_delivery'])
+        : (plan.price / (plan.deliveriesCount > 0 ? plan.deliveriesCount : 30));
+    final deliveries = plan.deliveriesCount > 0 ? plan.deliveriesCount : 30;
+    final discount = SafeParseUtil.toDouble(plan.pricingConfig?['discount_percent']);
+    final slotMultiplier = _selectedSlot.toLowerCase().contains('both') ? 2 : 1;
+    final raw = (basePrice * _quantity * slotMultiplier * deliveries * (1.0 - discount / 100.0)).roundToDouble();
+    return raw > 0 ? raw : (plan.price * _quantity);
+  }
 
   @override
   void dispose() {
@@ -123,7 +141,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
           (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
 
       final plan = _selectedPlan!;
-      final totalPrice = plan.price * _quantity;
+      final totalPrice = _calculatedTotalPrice;
       final bizConfig = ref.read(businessConfigProvider);
       final activeUpiId = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
 
@@ -140,7 +158,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
         'frequency': plan.frequency,
         'quantity': _quantity,
         'delivery_slot': _selectedSlot,
-        'price_per_delivery': 44,
+        'price_per_delivery': (totalPrice / (plan.deliveriesCount > 0 ? plan.deliveriesCount : 30)).round(),
         'total_price': totalPrice,
         'start_date': _startDate.toString().split(' ')[0],
         'address': selectedAddr?.address ?? 'Doorstep Address, Chennai',
@@ -276,79 +294,117 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
               title: Text(p.productName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               subtitle: Text('${p.timePeriod} • ${p.frequency}\n${p.description}', style: const TextStyle(fontSize: 12)),
               trailing: Text('₹${p.price.toStringAsFixed(0)}', style: AppTypography.price.copyWith(fontSize: 16)),
-              onTap: () => setState(() => _selectedPlan = p),
+              onTap: () => setState(() {
+                _selectedPlan = p;
+                _applyPlanDefaults(p);
+              }),
             ),
           );
         }),
 
-        const SizedBox(height: 14),
-        Text('Daily Quantity (Packets) *', style: AppTypography.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [1, 2, 3, 4].map((q) {
-            final isSel = _quantity == q;
-            return ChoiceChip(
-              label: Text('$q Packet${q > 1 ? 's' : ''}'),
-              selected: isSel,
-              onSelected: (_) => setState(() => _quantity = q),
-              selectedColor: AppColors.forestGreen,
-              labelStyle: TextStyle(
-                color: isSel ? Colors.white : AppColors.textDark,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+        if (_selectedPlan?.isQuantityEnabled ?? true) ...[
+          const SizedBox(height: 14),
+          Text('Daily Quantity (${_selectedPlan?.quantityUnit ?? 'Packets'}) *', style: AppTypography.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: (_selectedPlan?.quantityOptions ?? [
+              {'quantity': 1, 'label': '1 Packet'},
+              {'quantity': 2, 'label': '2 Packets'},
+              {'quantity': 3, 'label': '3 Packets'},
+              {'quantity': 4, 'label': '4 Packets'},
+            ]).map((opt) {
+              final q = SafeParseUtil.toInt(opt['quantity'], 1);
+              final label = (opt['label'] ?? '$q').toString();
+              final isSel = _quantity == q;
+              return ChoiceChip(
+                label: Text(label),
+                selected: isSel,
+                onSelected: (_) => setState(() => _quantity = q),
+                selectedColor: AppColors.forestGreen,
+                labelStyle: TextStyle(
+                  color: isSel ? Colors.white : AppColors.textDark,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+                side: BorderSide(color: isSel ? AppColors.forestGreen : AppColors.border),
+              );
+            }).toList(),
+          ),
+        ],
+
+        if (_selectedPlan?.isSlotEnabled ?? true) ...[
+          const SizedBox(height: 14),
+          Text('Delivery Slot (Morning / Evening) *', style: AppTypography.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: (_selectedPlan?.availableSlots ?? [
+              'Morning: 6:00 AM - 7:00 AM',
+              'Morning: 7:00 AM - 8:00 AM',
+            ]).map((s) {
+              final isSel = _selectedSlot == s;
+              return ChoiceChip(
+                label: Text('⏰ $s'),
+                selected: isSel,
+                onSelected: (_) => setState(() => _selectedSlot = s),
+                selectedColor: AppColors.forestGreen,
+                labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w600, fontSize: 11.5),
+              );
+            }).toList(),
+          ),
+        ],
+
+        if (_selectedPlan?.isStartDateEnabled ?? true) ...[
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: () async {
+              final noticeHours = _selectedPlan?.minNoticeHours ?? 12;
+              final firstPossible = DateTime.now().add(Duration(hours: noticeHours > 0 ? noticeHours : 12));
+              final maxDays = _selectedPlan?.maxAdvanceDays ?? 30;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _startDate.isBefore(firstPossible) ? firstPossible : _startDate,
+                firstDate: firstPossible,
+                lastDate: DateTime.now().add(Duration(days: maxDays)),
+              );
+              if (picked != null) {
+                setState(() => _startDate = picked);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
               ),
-              side: BorderSide(color: isSel ? AppColors.forestGreen : AppColors.border),
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 14),
-        Text('Delivery Slot (Morning / Evening) *', style: AppTypography.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _slots.map((s) {
-            final isSel = _selectedSlot == s;
-            return ChoiceChip(
-              label: Text('⏰ $s'),
-              selected: isSel,
-              onSelected: (_) => setState(() => _selectedSlot = s),
-              selectedColor: AppColors.forestGreen,
-              labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w600, fontSize: 11.5),
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 14),
-        InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _startDate,
-              firstDate: DateTime.now(),
-              lastDate: DateTime.now().add(const Duration(days: 90)),
-            );
-            if (picked != null) {
-              setState(() => _startDate = picked);
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Start Date: ${_startDate.toString().split(' ')[0]}', style: AppTypography.titleSmall),
+                  const Icon(Icons.calendar_today, size: 18, color: AppColors.forestGreen),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Start Date: ${_startDate.toString().split(' ')[0]}', style: AppTypography.titleSmall),
-                const Icon(Icons.calendar_today, size: 18, color: AppColors.forestGreen),
-              ],
-            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.paleGreen,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.softGreen),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Estimated Total Price:', style: AppTypography.titleSmall),
+              Text('₹${_calculatedTotalPrice.toStringAsFixed(0)}', style: AppTypography.price),
+            ],
           ),
         ),
         const SizedBox(height: 20),
@@ -358,7 +414,7 @@ class _SubscribeModalState extends ConsumerState<SubscribeModal> {
 
   Widget _buildStep2Payment() {
     final plan = _selectedPlan!;
-    final total = plan.price * _quantity;
+    final total = _calculatedTotalPrice;
     final bizConfig = ref.watch(businessConfigProvider);
     final activeUpiId = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
     final merchantName = bizConfig.merchantName.isNotEmpty ? bizConfig.merchantName : 'THULIRVA ORGANICS';

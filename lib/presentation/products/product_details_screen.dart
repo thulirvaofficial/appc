@@ -234,16 +234,33 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Purity Badges (Mockup Screen 7: 100% Natural, No Preservatives, Rich in Protein)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildFeatureBadge('🌿', '100% Natural'),
-                            _buildFeatureBadge('🛡️', 'No Preservatives'),
-                            _buildFeatureBadge('💪', 'Rich in Protein'),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
+                        // Feature Badges (Dynamic from Admin Backend)
+                        if (p.featureBadges.isNotEmpty) ...[
+                          Wrap(
+                            alignment: WrapAlignment.spaceAround,
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: p.featureBadges.where((b) {
+                              if (b is Map && b['enabled'] == false) return false;
+                              return true;
+                            }).map((b) {
+                              final icon = (b is Map ? b['icon'] : '🌿')?.toString() ?? '🌿';
+                              final title = (b is Map ? (b['text'] ?? b['title']) : b)?.toString() ?? '';
+                              return _buildFeatureBadge(icon, title);
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+                        ] else ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildFeatureBadge('🌿', '100% Natural'),
+                              _buildFeatureBadge('🛡️', 'No Preservatives'),
+                              _buildFeatureBadge('🐄', 'Farm Fresh'),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                        ],
 
                         // Key Highlights
                         if (p.highlights.isNotEmpty) ...[
@@ -279,7 +296,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         ],
 
                         // Ingredients
-                        if (p.ingredients.isNotEmpty) ...[
+                        if (p.ingredientsEnabled && p.ingredients.isNotEmpty) ...[
                           const Text(
                             'Pure Ingredients',
                             style: TextStyle(

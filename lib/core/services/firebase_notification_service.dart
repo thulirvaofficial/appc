@@ -270,6 +270,7 @@ class FirebaseNotificationService {
           'platform': 'android',
           'user_id': userId,
           'role': 'customer',
+          'app_type': 'customer',
         },
       );
       if (kDebugMode) {
@@ -295,6 +296,7 @@ class FirebaseNotificationService {
             'platform': 'android',
             'user_id': userId,
             'role': 'customer',
+            'app_type': 'customer',
           },
         );
       }
@@ -314,6 +316,7 @@ class FirebaseNotificationService {
             'platform': 'android',
             'user_id': null,
             'role': 'guest',
+            'app_type': 'customer',
           },
         );
       }

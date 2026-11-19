@@ -112,6 +112,8 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
         'token': token,
         'platform': platform,
         'user_id': user?.id,
+        'role': 'customer',
+        'app_type': 'customer',
       });
     } catch (_) {}
   }

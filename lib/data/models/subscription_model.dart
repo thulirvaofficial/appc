@@ -9,14 +9,72 @@ class SubscriptionPlanModel {
   final String timePeriod;
   final String frequency;
   final int durationDays;
+  final int deliveriesCount;
   final double price;
   final double? originalPrice;
   final int discountPercent;
   final String description;
   final String badge;
   final String status;
+  final bool isActive;
+  final bool isArchived;
+  final Map<String, dynamic>? quantityConfig;
+  final Map<String, dynamic>? deliverySlotConfig;
+  final Map<String, dynamic>? startDateConfig;
+  final Map<String, dynamic>? scheduleConfig;
+  final Map<String, dynamic>? pricingConfig;
 
   String get name => productName;
+
+  bool get isQuantityEnabled => quantityConfig?['enabled'] != false;
+  int get defaultQuantity => SafeParseUtil.toInt(quantityConfig?['default'], 1);
+  String get quantityUnit => quantityConfig?['unit']?.toString() ?? 'Packet';
+
+  List<Map<String, dynamic>> get quantityOptions {
+    if (quantityConfig?['options'] is List && (quantityConfig!['options'] as List).isNotEmpty) {
+      return (quantityConfig!['options'] as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    }
+    final unit = quantityUnit;
+    return [
+      {'quantity': 1, 'label': '1 $unit'},
+      {'quantity': 2, 'label': '2 ${unit}s'},
+      {'quantity': 3, 'label': '3 ${unit}s'},
+      {'quantity': 4, 'label': '4 ${unit}s'},
+    ];
+  }
+
+  bool get isSlotEnabled => deliverySlotConfig?['enabled'] != false;
+  bool get allowMultipleSlots => deliverySlotConfig?['allow_multiple_slots'] == true;
+  String get defaultSlot => deliverySlotConfig?['default_slot']?.toString() ?? 'Morning: 6:00 AM - 7:00 AM';
+
+  List<String> get availableSlots {
+    final List<String> list = [];
+    if (deliverySlotConfig?['slots'] is List && (deliverySlotConfig!['slots'] as List).isNotEmpty) {
+      for (final s in (deliverySlotConfig!['slots'] as List)) {
+        if (s is Map && s['enabled'] != false) {
+          final slotName = (s['name'] ?? '${s['start_time']} - ${s['end_time']}').toString();
+          if (slotName.isNotEmpty) list.add(slotName);
+        }
+      }
+    }
+    if (list.isEmpty) {
+      list.addAll([
+        'Morning: 5:30 AM - 6:30 AM',
+        'Morning: 6:00 AM - 7:00 AM',
+        'Morning: 7:00 AM - 8:00 AM',
+      ]);
+    }
+    if (allowMultipleSlots && !list.contains('Both Morning & Evening')) {
+      list.add('Both Morning & Evening');
+    }
+    return list;
+  }
+
+  bool get isStartDateEnabled => startDateConfig?['enabled'] != false;
+  int get minNoticeHours => SafeParseUtil.toInt(startDateConfig?['min_notice_hours'], 12);
+  int get maxAdvanceDays => SafeParseUtil.toInt(startDateConfig?['max_advance_days'], 30);
 
   SubscriptionPlanModel({
     required this.id,
@@ -27,29 +85,46 @@ class SubscriptionPlanModel {
     required this.timePeriod,
     this.frequency = 'Daily',
     this.durationDays = 30,
+    int? deliveriesCount,
     required this.price,
     this.originalPrice,
     this.discountPercent = 0,
     this.description = '',
     this.badge = 'Popular',
     this.status = 'active',
-  }) : productName = productName ?? name ?? 'Farm Fresh Product';
+    this.isActive = true,
+    this.isArchived = false,
+    this.quantityConfig,
+    this.deliverySlotConfig,
+    this.startDateConfig,
+    this.scheduleConfig,
+    this.pricingConfig,
+  })  : productName = productName ?? name ?? 'Farm Fresh Product',
+        deliveriesCount = deliveriesCount ?? durationDays;
 
   factory SubscriptionPlanModel.fromJson(Map<String, dynamic> json) {
     return SubscriptionPlanModel(
       id: json['id'] ?? 0,
       productId: json['product_id'],
-      productName: json['product_name'] ?? 'Farm Fresh Product',
-      productImage: json['product_image'],
+      productName: json['product_name'] ?? json['name'] ?? 'Farm Fresh Product',
+      productImage: json['product_image'] ?? json['image'],
       timePeriod: json['time_period'] ?? 'Daily Morning (30 Days)',
       frequency: json['frequency'] ?? 'Daily',
-      durationDays: SafeParseUtil.toInt(json['duration_days'], 30),
+      durationDays: SafeParseUtil.toInt(json['duration_days'] ?? json['deliveries_count'], 30),
+      deliveriesCount: SafeParseUtil.toInt(json['deliveries_count'] ?? json['duration_days'], 30),
       price: SafeParseUtil.toDouble(json['price']),
       originalPrice: json['original_price'] != null ? SafeParseUtil.toDouble(json['original_price']) : null,
       discountPercent: SafeParseUtil.toInt(json['discount_percent']),
       description: json['description'] ?? '',
       badge: json['badge'] ?? 'Popular',
       status: json['status'] ?? 'active',
+      isActive: json['is_active'] != false,
+      isArchived: json['is_archived'] == true,
+      quantityConfig: json['quantity_config'] is Map ? Map<String, dynamic>.from(json['quantity_config'] as Map) : null,
+      deliverySlotConfig: json['delivery_slot_config'] is Map ? Map<String, dynamic>.from(json['delivery_slot_config'] as Map) : null,
+      startDateConfig: json['start_date_config'] is Map ? Map<String, dynamic>.from(json['start_date_config'] as Map) : null,
+      scheduleConfig: json['schedule_config'] is Map ? Map<String, dynamic>.from(json['schedule_config'] as Map) : null,
+      pricingConfig: json['pricing_config'] is Map ? Map<String, dynamic>.from(json['pricing_config'] as Map) : null,
     );
   }
 }
