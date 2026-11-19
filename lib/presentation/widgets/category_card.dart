@@ -143,8 +143,12 @@ class CategoryCard extends StatelessWidget {
   }
 
   Widget _buildPhoto() {
+    if (!category.hasCustomImage || category.mobileImageUrl.isEmpty) {
+      return _fallbackPhoto();
+    }
     return CachedNetworkImage(
       imageUrl: category.mobileImageUrl,
+      cacheKey: '${category.id}_${category.updatedAt ?? category.mobileImageUrl}',
       fit: BoxFit.cover,
       placeholder: (_, __) => Container(
         color: const Color(0xFFF3F7F2),

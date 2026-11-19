@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/api_endpoints.dart';
 import '../data/models/category_model.dart';
@@ -51,6 +53,17 @@ class CategoryNotifier extends StateNotifier<CategoryState> {
             .where((c) => c.isActive)
             .toList();
         list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+        // Invalidate and evict cached images for categories that have updated URLs
+        for (final oldCat in state.categories) {
+          final newMatch = list.where((c) => c.id == oldCat.id).firstOrNull;
+          if (newMatch != null && newMatch.mobileImageUrl != oldCat.mobileImageUrl && oldCat.mobileImageUrl.isNotEmpty) {
+            CachedNetworkImage.evictFromCache(oldCat.mobileImageUrl);
+          }
+        }
+        PaintingBinding.instance.imageCache.clear();
+        PaintingBinding.instance.imageCache.clearLiveImages();
+
         state = state.copyWith(categories: list, isLoading: false);
       } else if (data is List) {
         final list = data
@@ -58,6 +71,16 @@ class CategoryNotifier extends StateNotifier<CategoryState> {
             .where((c) => c.isActive)
             .toList();
         list.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+
+        for (final oldCat in state.categories) {
+          final newMatch = list.where((c) => c.id == oldCat.id).firstOrNull;
+          if (newMatch != null && newMatch.mobileImageUrl != oldCat.mobileImageUrl && oldCat.mobileImageUrl.isNotEmpty) {
+            CachedNetworkImage.evictFromCache(oldCat.mobileImageUrl);
+          }
+        }
+        PaintingBinding.instance.imageCache.clear();
+        PaintingBinding.instance.imageCache.clearLiveImages();
+
         state = state.copyWith(categories: list, isLoading: false);
       } else {
         state = state.copyWith(

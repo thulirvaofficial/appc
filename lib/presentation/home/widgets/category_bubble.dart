@@ -42,9 +42,10 @@ class CategoryBubble extends StatelessWidget {
               ],
             ),
             clipBehavior: Clip.antiAlias,
-            child: (category.mobileImage != null && category.mobileImage!.isNotEmpty)
+            child: (category.hasCustomImage && category.mobileImageUrl.isNotEmpty)
                 ? CachedNetworkImage(
                     imageUrl: category.mobileImageUrl,
+                    cacheKey: '${category.id}_${category.updatedAt ?? category.mobileImageUrl}',
                     fit: BoxFit.cover,
                     placeholder: (_, __) => Center(
                       child: Text(category.emoji ?? '🥛', style: const TextStyle(fontSize: 24)),

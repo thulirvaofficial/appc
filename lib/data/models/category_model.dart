@@ -91,10 +91,28 @@ class CategoryModel {
     );
   }
 
-  /// Always returns resolved URL specifically for mobile app image
+  /// Whether this category has a designated custom image from server
+  bool get hasCustomImage =>
+      (categoryImage != null && categoryImage!.trim().isNotEmpty) ||
+      (mobileImage != null && mobileImage!.trim().isNotEmpty) ||
+      (image != null && image!.trim().isNotEmpty);
+
+  /// Always returns resolved URL specifically for mobile app image with cache-busting version
   String get mobileImageUrl {
-    final path = categoryImage ?? mobileImage ?? image ?? '/assets/images/products/fresh_cow_milk.jpg';
-    return ApiEndpoints.resolveImageUrl(path);
+    final rawPath = (categoryImage != null && categoryImage!.trim().isNotEmpty)
+        ? categoryImage!.trim()
+        : ((mobileImage != null && mobileImage!.trim().isNotEmpty)
+            ? mobileImage!.trim()
+            : ((image != null && image!.trim().isNotEmpty) ? image!.trim() : ''));
+    if (rawPath.isEmpty) return '';
+
+    String resolved = ApiEndpoints.resolveImageUrl(rawPath);
+    if (updatedAt != null && updatedAt!.isNotEmpty && !resolved.contains('v=')) {
+      final sep = resolved.contains('?') ? '&' : '?';
+      final v = DateTime.tryParse(updatedAt!)?.millisecondsSinceEpoch.toString() ?? updatedAt!.hashCode.abs().toString();
+      resolved = '$resolved${sep}v=$v';
+    }
+    return resolved;
   }
 
   Map<String, dynamic> toJson() {

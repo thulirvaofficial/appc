@@ -50,26 +50,34 @@ class HomeCategoryCard extends StatelessWidget {
             SizedBox(
               height: 68,
               width: double.infinity,
-              child: CachedNetworkImage(
-                imageUrl: category.mobileImageUrl,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  color: const Color(0xFFF3F7F2),
-                  child: const Center(
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
+              child: (!category.hasCustomImage || category.mobileImageUrl.isEmpty)
+                  ? Container(
+                      color: const Color(0xFFF0F6EE),
+                      child: Center(
+                        child: Text(category.emoji ?? '🥛', style: const TextStyle(fontSize: 28)),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: category.mobileImageUrl,
+                      cacheKey: '${category.id}_${category.updatedAt ?? category.mobileImageUrl}',
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        color: const Color(0xFFF3F7F2),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.forestGreen),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        color: const Color(0xFFF0F6EE),
+                        child: Center(
+                          child: Text(category.emoji ?? '🥛', style: const TextStyle(fontSize: 28)),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  color: const Color(0xFFF0F6EE),
-                  child: Center(
-                    child: Text(category.emoji ?? '🥛', style: const TextStyle(fontSize: 28)),
-                  ),
-                ),
-              ),
             ),
             // Bottom Category Label
             Expanded(

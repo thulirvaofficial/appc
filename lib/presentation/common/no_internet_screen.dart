@@ -99,21 +99,13 @@ class _NoInternetScreenState extends ConsumerState<NoInternetScreen> {
                 bottom: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: Row(
-                    children: [
-                      // Hamburger Menu
-                      IconButton(
-                        icon: const Icon(Icons.menu, color: Colors.white, size: 24),
-                        onPressed: widget.onOpenDrawer,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 14),
-
-                      // Perfectly Round Circular Emblem & Brand Logo (Crisp White & Gold, no clipping)
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    height: 40,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Perfectly Centered Circular Emblem & Brand Logo (Matches Reference Artwork Exactly)
+                        Center(
                           child: Image.asset(
                             'assets/images/thulirva_brand_logo_white.png',
                             height: 38,
@@ -134,62 +126,79 @@ class _NoInternetScreenState extends ConsumerState<NoInternetScreen> {
                             ),
                           ),
                         ),
-                      ),
 
-                      // Notification Bell
-                      IconButton(
-                        icon: Badge(
-                          isLabelVisible: unreadNotifs > 0,
-                          backgroundColor: AppColors.cancelled,
-                          label: Text(
-                            '$unreadNotifs',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.notifications_none_outlined,
-                            color: Colors.white,
-                            size: 22,
+                        // Hamburger Menu on Far Left
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            icon: const Icon(Icons.menu, color: Colors.white, size: 24),
+                            onPressed: widget.onOpenDrawer,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                           ),
                         ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                          );
-                        },
-                      ),
 
-                      // Cart Icon with Badge
-                      IconButton(
-                        icon: Badge(
-                          isLabelVisible: cartCount > 0,
-                          backgroundColor: AppColors.cancelled,
-                          label: Text(
-                            '$cartCount',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.shopping_cart_outlined,
-                            color: Colors.white,
-                            size: 22,
+                        // Notification Bell and Cart Icon with Badge on Far Right
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Badge(
+                                  isLabelVisible: unreadNotifs > 0,
+                                  backgroundColor: AppColors.cancelled,
+                                  label: Text(
+                                    '$unreadNotifs',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications_none_outlined,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: Badge(
+                                  isLabelVisible: cartCount > 0,
+                                  backgroundColor: AppColors.cancelled,
+                                  label: Text(
+                                    '$cartCount',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.shopping_cart_outlined,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const CartScreen()),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const CartScreen()),
-                          );
-                        },
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
