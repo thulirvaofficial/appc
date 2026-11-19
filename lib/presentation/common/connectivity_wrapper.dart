@@ -49,3 +49,4 @@ class _ConnectivityWrapperState extends ConsumerState<ConnectivityWrapper> {
     );
   }
 }
+

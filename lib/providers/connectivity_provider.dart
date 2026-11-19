@@ -65,3 +65,4 @@ final connectivityProvider = StateNotifierProvider<ConnectivityNotifier, bool>((
   final service = ref.watch(connectivityServiceProvider);
   return ConnectivityNotifier(ref, service);
 });
+

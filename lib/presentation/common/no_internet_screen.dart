@@ -424,3 +424,4 @@ class _NoInternetScreenState extends ConsumerState<NoInternetScreen> {
     );
   }
 }
+

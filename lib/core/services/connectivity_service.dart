@@ -184,3 +184,4 @@ class ConnectivityService {
     _periodicOfflineTimer = null;
   }
 }
+
