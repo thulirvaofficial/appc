@@ -53,6 +53,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     '6:00 PM - 8:00 PM',
   ];
 
+  // Delivery Schedule / Slots State
+  bool _deliveryTimeSelectionEnabled = true;
+  String _deliveryMode = 'standard';
+  String _selectedDeliverySlotId = 'morning';
+  String _selectedDeliverySlotName = 'Morning Delivery';
+  String _selectedDeliverySlotTime = '06:00 AM – 07:00 AM';
+  String _selectedDeliverySlotDisplay = 'Morning Delivery (06:00 AM – 07:00 AM)';
+  List<Map<String, dynamic>> _availableDeliverySlots = [];
+
   final TextEditingController _utrController = TextEditingController();
   File? _paymentProofFile;
   String? _paymentProofBase64;
@@ -96,6 +105,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           }
         });
       }
+
+      try {
+        final slotRes = await api.get('/api/delivery-slots');
+        if (mounted && slotRes.data is Map && slotRes.data['success'] == true) {
+          final data = slotRes.data as Map<String, dynamic>;
+          setState(() {
+            _deliveryTimeSelectionEnabled = data['enabled'] != false;
+            _deliveryMode = data['mode']?.toString() ?? 'standard';
+            final rawSlots = data['slots'] as List<dynamic>? ?? [];
+            if (rawSlots.isNotEmpty) {
+              _availableDeliverySlots = rawSlots.map((s) => Map<String, dynamic>.from(s as Map)).toList();
+              final defaultId = data['default_slot_id']?.toString() ?? _availableDeliverySlots.first['id']?.toString() ?? 'morning';
+              final match = _availableDeliverySlots.firstWhere((s) => s['id']?.toString() == defaultId, orElse: () => _availableDeliverySlots.first);
+              _selectedDeliverySlotId = match['id']?.toString() ?? 'morning';
+              _selectedDeliverySlotName = match['name']?.toString() ?? 'Morning Delivery';
+              _selectedDeliverySlotTime = '${match['start_time']} – ${match['end_time']}';
+              _selectedDeliverySlotDisplay = match['display_text']?.toString() ?? '$_selectedDeliverySlotName ($_selectedDeliverySlotTime)';
+            }
+          });
+        }
+      } catch (_) {}
     } catch (_) {}
   }
 
@@ -437,7 +467,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           'time_period': subIt.product.weight.isNotEmpty ? subIt.product.weight : 'Daily Morning (30 Days)',
           'frequency': 'Daily',
           'quantity': subIt.quantity,
-          'delivery_slot': isPickup ? _selectedPickupSlot : '6:00 AM - 7:00 AM',
+          'delivery_slot': isPickup ? _selectedPickupSlot : _selectedDeliverySlotDisplay,
           'price_per_delivery': 44,
           'total_price': subIt.totalPrice,
           'start_date': DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
@@ -541,6 +571,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'pickup_location_id': _selectedPickupLocation?['id'] ?? 1,
       'pickup_location_name': _selectedPickupLocation?['name'] ?? storeSettings.storeName,
       'pickup_slot': isPickup ? _selectedPickupSlot : null,
+      'delivery_slot': isPickup ? _selectedPickupSlot : _selectedDeliverySlotDisplay,
+      'delivery_slot_id': isPickup ? 'pickup' : _selectedDeliverySlotId,
+      'delivery_start_time': isPickup ? _selectedPickupSlot.split('-').first.trim() : _selectedDeliverySlotTime.split('–').first.trim(),
+      'delivery_end_time': isPickup ? _selectedPickupSlot.split('-').last.trim() : _selectedDeliverySlotTime.split('–').last.trim(),
       'address': isPickup ? (_selectedPickupLocation?['address'] ?? storeSettings.storeAddress) : selectedAddr!.address,
       'city': isPickup ? (_selectedPickupLocation?['city'] ?? 'Kanchipuram') : selectedAddr!.city,
       'state': isPickup ? 'Tamil Nadu' : selectedAddr!.state,
@@ -1212,6 +1246,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ),
                     ),
                   ],
+                  if (!isPickup) ...[
+                    const SizedBox(height: 14),
+                    _buildDeliverySlotSelector(),
+                  ],
                   const SizedBox(height: 14),
 
                   // 3. PAYMENT METHOD SECTION: ONLY MERCHANT UPI QR GATEWAY
@@ -1755,6 +1793,179 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliverySlotSelector() {
+    if (!_deliveryTimeSelectionEnabled) {
+      return const SizedBox.shrink();
+    }
+
+    final slots = _availableDeliverySlots.isNotEmpty
+        ? _availableDeliverySlots
+        : [
+            {
+              'id': 'morning',
+              'name': 'Morning Delivery',
+              'start_time': '06:00 AM',
+              'end_time': '07:00 AM',
+              'display_text': 'Morning Delivery (06:00 AM – 07:00 AM)',
+            },
+            {
+              'id': 'evening',
+              'name': 'Evening Delivery',
+              'start_time': '06:00 PM',
+              'end_time': '07:00 PM',
+              'display_text': 'Evening Delivery (06:00 PM – 07:00 PM)',
+            },
+          ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5EDE2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.schedule_rounded, color: AppColors.forestGreen, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Select Delivery Schedule *',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.forestGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Choose your preferred delivery time window for this order:',
+            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+          ),
+          const SizedBox(height: 12),
+          if (_deliveryMode == '24x7') ...[
+            DropdownButtonFormField<String>(
+              value: slots.any((s) => s['id']?.toString() == _selectedDeliverySlotId)
+                  ? _selectedDeliverySlotId
+                  : slots.first['id']?.toString(),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                filled: true,
+                fillColor: const Color(0xFFF9FDF9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFC8E6C9)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFC8E6C9)),
+                ),
+              ),
+              items: slots.map((s) {
+                final id = s['id']?.toString() ?? '';
+                final name = s['name']?.toString() ?? id;
+                return DropdownMenuItem<String>(
+                  value: id,
+                  child: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  final match = slots.firstWhere((s) => s['id']?.toString() == val, orElse: () => slots.first);
+                  setState(() {
+                    _selectedDeliverySlotId = val;
+                    _selectedDeliverySlotName = match['name']?.toString() ?? val;
+                    _selectedDeliverySlotTime = '${match['start_time']} – ${match['end_time']}';
+                    _selectedDeliverySlotDisplay = match['display_text']?.toString() ?? '$_selectedDeliverySlotName ($_selectedDeliverySlotTime)';
+                  });
+                }
+              },
+            ),
+          ] else ...[
+            Row(
+              children: slots.map((s) {
+                final id = s['id']?.toString() ?? '';
+                final name = s['name']?.toString() ?? (id == 'morning' ? 'Morning Delivery' : 'Evening Delivery');
+                final time = '${s['start_time'] ?? (id == 'morning' ? '06:00 AM' : '06:00 PM')} – ${s['end_time'] ?? (id == 'morning' ? '07:00 AM' : '07:00 PM')}';
+                final isSelected = _selectedDeliverySlotId == id;
+                final isMorning = id.toLowerCase().contains('morning');
+
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedDeliverySlotId = id;
+                        _selectedDeliverySlotName = name;
+                        _selectedDeliverySlotTime = time;
+                        _selectedDeliverySlotDisplay = s['display_text']?.toString() ?? '$name ($time)';
+                      });
+                    },
+                    child: Container(
+                      margin: EdgeInsets.only(left: id == slots.first['id'] ? 0 : 8),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? AppColors.forestGreen : const Color(0xFFD1D5DB),
+                          width: isSelected ? 1.8 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Icon(
+                                isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
+                                color: isSelected
+                                    ? (isMorning ? Colors.amber.shade700 : Colors.indigo.shade700)
+                                    : Colors.grey.shade500,
+                                size: 20,
+                              ),
+                              Icon(
+                                isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                                color: isSelected ? AppColors.forestGreen : Colors.grey.shade400,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? AppColors.forestGreen : const Color(0xFF1F2937),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            time,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected ? const Color(0xFF166534) : const Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );

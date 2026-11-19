@@ -691,7 +691,15 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            // Dedicated Delivery Schedule Timing Card (Matches Subscription Card Style)
+            _buildDeliveryTimingBadge(
+              slotText: order.deliverySlot,
+              isPickup: isPickup,
+              pickupSlot: order.pickupSlot,
+            ),
+            const SizedBox(height: 10),
 
             // Total Amount & View Details
             Wrap(
@@ -1113,6 +1121,92 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen> {
           overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+  }
+
+  Widget _buildDeliveryTimingBadge({
+    required String? slotText,
+    required bool isPickup,
+    String? pickupSlot,
+  }) {
+    final effective = (slotText != null && slotText.trim().isNotEmpty)
+        ? slotText.trim()
+        : ((pickupSlot != null && pickupSlot.trim().isNotEmpty)
+            ? pickupSlot.trim()
+            : '');
+
+    final hasSlot = effective.isNotEmpty;
+
+    String slotName = isPickup ? 'Pickup Window' : 'Delivery Schedule';
+    String timeRange = effective;
+
+    if (effective.contains('(') && effective.contains(')')) {
+      final parts = effective.split('(');
+      slotName = parts[0].trim();
+      timeRange = parts[1].replaceAll(')', '').trim();
+    } else if (effective.toLowerCase().contains('morning')) {
+      slotName = 'Morning Delivery';
+      if (!timeRange.contains(':')) timeRange = '6:00 AM – 7:00 AM';
+    } else if (effective.toLowerCase().contains('evening')) {
+      slotName = 'Evening Delivery';
+      if (!timeRange.contains(':')) timeRange = '6:00 PM – 7:00 PM';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: hasSlot ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: hasSlot ? const Color(0xFFC8E6C9) : const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasSlot ? Icons.access_time_filled_rounded : Icons.schedule_rounded,
+            size: 15,
+            color: hasSlot ? const Color(0xFF2E7D32) : const Color(0xFF6B7280),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: hasSlot
+                ? Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$slotName: ',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                        TextSpan(
+                          text: timeRange,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const Text(
+                    'Delivery time not specified',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B7280),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

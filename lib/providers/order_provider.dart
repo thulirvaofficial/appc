@@ -17,19 +17,19 @@ class CustomerOrderFeedItem {
   CustomerOrderFeedItem.product(this.productOrder)
       : type = CustomerOrderItemType.product,
         subscriptionOrder = null,
-        createdDateTime = _parseDate(productOrder?.createdAt);
+        createdDateTime = productOrder?.createdDateTime ?? _parseDate(productOrder?.createdAt);
 
   CustomerOrderFeedItem.subscription(this.subscriptionOrder)
       : type = CustomerOrderItemType.subscription,
         productOrder = null,
-        createdDateTime = _parseDate(subscriptionOrder?.createdAt ?? subscriptionOrder?.startDate);
+        createdDateTime = subscriptionOrder?.createdDateTime ?? _parseDate(subscriptionOrder?.createdAt ?? subscriptionOrder?.startDate);
 
   static DateTime _parseDate(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return DateTime.now();
+    if (raw == null || raw.trim().isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
     try {
       return DateTime.parse(raw);
     } catch (_) {
-      return DateTime.now();
+      return DateTime.fromMillisecondsSinceEpoch(0);
     }
   }
 
@@ -99,11 +99,12 @@ class OrderState {
     }
 
     if (selectedFilter == 'All' || selectedFilter == 'All Orders') {
+      feed.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
       return feed;
     }
 
     final f = selectedFilter.toLowerCase().replaceAll(' ', '_');
-    return feed.where((item) {
+    final res = feed.where((item) {
       if (item.type == CustomerOrderItemType.product) {
         final s = item.productOrder!.orderStatus.toLowerCase().replaceAll(' ', '_');
         if (f == 'ready_for_pickup') return s == 'ready' || s == 'ready_for_pickup';
@@ -119,6 +120,8 @@ class OrderState {
         return s == f || p == f;
       }
     }).toList();
+    res.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
+    return res;
   }
 
   List<OrderModel> get filteredOrders {
@@ -127,9 +130,11 @@ class OrderState {
         !o.id.toString().toUpperCase().startsWith('SUB-') &&
         !(o.orderNumber?.toUpperCase().startsWith('SUB-') ?? false)).toList();
 
+    productOrders.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
+
     if (selectedFilter == 'All' || selectedFilter == 'All Orders') return productOrders;
     final f = selectedFilter.toLowerCase().replaceAll(' ', '_');
-    return productOrders.where((o) {
+    final res = productOrders.where((o) {
       final s = o.orderStatus.toLowerCase().replaceAll(' ', '_');
       if (f == 'ready_for_pickup') {
         return s == 'ready' || s == 'ready_for_pickup';
@@ -139,6 +144,8 @@ class OrderState {
       }
       return s == f;
     }).toList();
+    res.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
+    return res;
   }
 }
 
@@ -197,6 +204,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
                   !o.id.toString().toUpperCase().startsWith('SUB-') &&
                   !(o.orderNumber?.toUpperCase().startsWith('SUB-') ?? false))
               .toList();
+          fetchedOrders.sort((a, b) => b.createdDateTime.compareTo(a.createdDateTime));
         }
       } catch (_) {}
 
@@ -206,6 +214,8 @@ class OrderNotifier extends StateNotifier<OrderState> {
           fetchedSubs = (subsRes.data['subscriptions'] as List)
               .map((s) => SubscriptionModel.fromJson(s as Map<String, dynamic>))
               .toList();
+          fetchedSubs.sort((a, b) => (b.createdDateTime ?? DateTime.fromMillisecondsSinceEpoch(0))
+              .compareTo(a.createdDateTime ?? DateTime.fromMillisecondsSinceEpoch(0)));
         }
       } catch (_) {}
 

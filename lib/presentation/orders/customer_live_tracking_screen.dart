@@ -844,7 +844,36 @@ class _CustomerLiveTrackingScreenState extends ConsumerState<CustomerLiveTrackin
             bottom: isLandscape ? 16 : 24,
             left: isLandscape ? 278 : 16,
             right: isLandscape ? 24 : 16,
-            child: _buildBottomProgressCard(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_order.deliverySlot != null && _order.deliverySlot!.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFC8E6C9)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.access_time_filled_rounded, size: 14, color: Color(0xFF2E7D32)),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Schedule: ${_order.deliverySlot!}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                        ),
+                      ],
+                    ),
+                  ),
+                _buildBottomProgressCard(),
+              ],
+            ),
           ),
         ],
       ),

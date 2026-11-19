@@ -309,19 +309,23 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              order.formattedOrderId,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
-                color: AppColors.forestGreen,
-                letterSpacing: 0.5,
+            Flexible(
+              child: Text(
+                order.formattedOrderId,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16.5,
+                  color: AppColors.forestGreen,
+                  letterSpacing: 0.3,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
             InkWell(
               onTap: () => IdFormatter.copyToClipboard(context, order.formattedOrderId, label: 'Order ID'),
-              child: const Icon(Icons.copy, size: 16, color: AppColors.forestGreen),
+              child: const Icon(Icons.copy, size: 15, color: AppColors.forestGreen),
             ),
           ],
         ),
@@ -378,7 +382,10 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -395,7 +402,6 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                                 ),
                               ),
                             ),
-                            const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
@@ -424,6 +430,10 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+
+            // DELIVERY SCHEDULE TIMING CARD (Matching Subscription Card Style)
+            _buildDeliveryTimingScheduleCard(order),
             const SizedBox(height: 16),
 
             // Order Tracking Timeline
@@ -715,15 +725,21 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                           Text(
                             order.partnerName ?? 'Finding a delivery partner...',
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: Color(0xFF1E293B)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               const Icon(Icons.star, size: 14, color: Color(0xFFF59E0B)),
                               const SizedBox(width: 4),
-                              Text(
-                                '${order.partnerRating?.toStringAsFixed(1) ?? '5.0'} • ${order.partnerVehicle ?? 'Delivery Partner'}',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              Expanded(
+                                child: Text(
+                                  '${order.partnerRating?.toStringAsFixed(1) ?? '5.0'} • ${order.partnerVehicle ?? 'Delivery Partner'}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -1290,6 +1306,87 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 ),
               );
             }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryTimingScheduleCard(OrderModel order) {
+    final isPickup = order.isPickup || order.deliveryType.toLowerCase() == 'pickup';
+    final effective = (order.deliverySlot != null && order.deliverySlot!.trim().isNotEmpty)
+        ? order.deliverySlot!.trim()
+        : ((order.pickupSlot != null && order.pickupSlot!.trim().isNotEmpty)
+            ? order.pickupSlot!.trim()
+            : '');
+
+    final hasSlot = effective.isNotEmpty;
+
+    String slotName = isPickup ? 'Farm Store Pickup Window' : 'Scheduled Delivery Window';
+    String timeRange = effective;
+
+    if (effective.contains('(') && effective.contains(')')) {
+      final parts = effective.split('(');
+      slotName = parts[0].trim();
+      timeRange = parts[1].replaceAll(')', '').trim();
+    } else if (effective.toLowerCase().contains('morning')) {
+      slotName = 'Morning Delivery';
+      if (!timeRange.contains(':')) timeRange = '6:00 AM – 7:00 AM';
+    } else if (effective.toLowerCase().contains('evening')) {
+      slotName = 'Evening Delivery';
+      if (!timeRange.contains(':')) timeRange = '6:00 PM – 7:00 PM';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: hasSlot ? const Color(0xFFE8F5E9) : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasSlot ? const Color(0xFFC8E6C9) : const Color(0xFFE5E7EB),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: hasSlot ? const Color(0xFFC8E6C9).withOpacity(0.4) : Colors.grey.shade200,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              hasSlot ? Icons.access_time_filled_rounded : Icons.schedule_rounded,
+              size: 22,
+              color: hasSlot ? const Color(0xFF1B5E20) : const Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  slotName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: hasSlot ? const Color(0xFF1B5E20) : const Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasSlot ? timeRange : 'Delivery time not specified',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: hasSlot ? FontWeight.w700 : FontWeight.w500,
+                    color: hasSlot ? const Color(0xFF2E7D32) : const Color(0xFF6B7280),
+                    fontStyle: hasSlot ? FontStyle.normal : FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

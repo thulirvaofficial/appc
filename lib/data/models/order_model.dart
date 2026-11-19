@@ -43,11 +43,35 @@ class OrderModel {
   final double? longitude;
   final String? deliveryProofUrl;
   final String? deliveredAt;
+  final String? deliverySlot;
+  final String? deliverySlotId;
+  final String? deliveryDate;
+  final String? deliveryStartTime;
+  final String? deliveryEndTime;
 
   dynamic get orderId => orderNumber ?? id;
   String get formattedOrderId => IdFormatter.formatOrderId(orderNumber ?? id);
   String get formattedCustomerId => IdFormatter.formatCustomerId(userId);
   double get totalPrice => total;
+
+  DateTime get createdDateTime {
+    if (createdAt.isNotEmpty) {
+      try {
+        return DateTime.parse(createdAt);
+      } catch (_) {}
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  String get effectiveDeliverySlot {
+    if (deliverySlot != null && deliverySlot!.trim().isNotEmpty) {
+      return deliverySlot!.trim();
+    }
+    if (pickupSlot != null && pickupSlot!.trim().isNotEmpty) {
+      return pickupSlot!.trim();
+    }
+    return '';
+  }
 
   OrderModel({
     required this.id,
@@ -90,6 +114,11 @@ class OrderModel {
     this.longitude,
     this.deliveryProofUrl,
     this.deliveredAt,
+    this.deliverySlot,
+    this.deliverySlotId,
+    this.deliveryDate,
+    this.deliveryStartTime,
+    this.deliveryEndTime,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -117,11 +146,16 @@ class OrderModel {
       orderStatus: json['order_status'] ?? json['status'] ?? 'pending',
       transactionId: json['transaction_id'] ?? json['transactionId'],
       paymentProof: json['payment_proof'] ?? json['paymentProof'],
-      createdAt: json['created_at'] ?? DateTime.now().toString(),
+      createdAt: json['created_at']?.toString() ?? json['createdAt']?.toString() ?? json['date']?.toString() ?? '',
       deliveryType: dType,
       isPickup: isPick,
       pickupSlot: json['pickup_slot']?.toString(),
       pickupLocationName: json['pickup_location_name']?.toString(),
+      deliverySlot: json['delivery_slot']?.toString() ?? json['deliverySlot']?.toString() ?? json['pickup_slot']?.toString(),
+      deliverySlotId: json['delivery_slot_id']?.toString() ?? json['deliverySlotId']?.toString(),
+      deliveryDate: json['delivery_date']?.toString() ?? json['deliveryDate']?.toString(),
+      deliveryStartTime: json['delivery_start_time']?.toString() ?? json['deliveryStartTime']?.toString(),
+      deliveryEndTime: json['delivery_end_time']?.toString() ?? json['deliveryEndTime']?.toString(),
       orderNumber: json['order_number']?.toString(),
       partnerId: json['partner_id']?.toString(),
       partnerName: json['partner_name']?.toString(),
@@ -181,6 +215,11 @@ class OrderModel {
     double? longitude,
     String? deliveryProofUrl,
     String? deliveredAt,
+    String? deliverySlot,
+    String? deliverySlotId,
+    String? deliveryDate,
+    String? deliveryStartTime,
+    String? deliveryEndTime,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -223,6 +262,11 @@ class OrderModel {
       longitude: longitude ?? this.longitude,
       deliveryProofUrl: deliveryProofUrl ?? this.deliveryProofUrl,
       deliveredAt: deliveredAt ?? this.deliveredAt,
+      deliverySlot: deliverySlot ?? this.deliverySlot,
+      deliverySlotId: deliverySlotId ?? this.deliverySlotId,
+      deliveryDate: deliveryDate ?? this.deliveryDate,
+      deliveryStartTime: deliveryStartTime ?? this.deliveryStartTime,
+      deliveryEndTime: deliveryEndTime ?? this.deliveryEndTime,
     );
   }
 
@@ -254,6 +298,11 @@ class OrderModel {
       'pickup_slot': pickupSlot,
       'pickup_location_name': pickupLocationName,
       'order_number': orderNumber,
+      'delivery_slot': deliverySlot,
+      'delivery_slot_id': deliverySlotId,
+      'delivery_date': deliveryDate,
+      'delivery_start_time': deliveryStartTime,
+      'delivery_end_time': deliveryEndTime,
     };
   }
 }
