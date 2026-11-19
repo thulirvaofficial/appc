@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_colors.dart';
+import '../providers/current_tab_provider.dart';
 import '../providers/order_provider.dart';
 import 'categories/categories_screen.dart';
 import 'home/home_screen.dart';
@@ -28,6 +29,11 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _tabHistory.add(_currentIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(currentTabProvider.notifier).state = _currentIndex;
+      }
+    });
   }
 
   void _onTabTapped(int index) {
@@ -37,6 +43,7 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
     if (_currentIndex != index) {
       _tabHistory.add(index);
     }
+    ref.read(currentTabProvider.notifier).state = index;
     setState(() => _currentIndex = index);
   }
 
@@ -46,6 +53,11 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    final syncedTab = ref.watch(currentTabProvider);
+    if (syncedTab != _currentIndex) {
+      _currentIndex = syncedTab;
+    }
+
     final screens = [
       HomeScreen(onOpenDrawer: openDrawer, onNavigateToTab: _onTabTapped),
       CategoriesScreen(onNavigateToTab: _onTabTapped),

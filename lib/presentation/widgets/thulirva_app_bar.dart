@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/cart_provider.dart';
@@ -19,6 +20,7 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback? onSettingsTap;
   final List<Widget>? customActions;
   final Color backgroundColor;
+  final bool roundedBottom;
 
   const ThulirvaAppBar({
     super.key,
@@ -34,6 +36,7 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
     this.onSettingsTap,
     this.customActions,
     this.backgroundColor = Colors.transparent,
+    this.roundedBottom = false,
   });
 
   @override
@@ -46,16 +49,25 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
     final notifState = ref.watch(notificationProvider);
     final unreadNotifs = notifState.unreadCount;
 
+    final isDarkHeader = backgroundColor == AppColors.forestGreen ||
+        backgroundColor == AppColors.darkGreen ||
+        backgroundColor == AppColors.deepGreen;
+
+    final iconColor = isDarkHeader ? Colors.white : AppColors.forestGreen;
+    final logoAsset = isDarkHeader
+        ? 'assets/images/thulirva_brand_logo_white.png'
+        : 'assets/images/thulirva_brand_logo.png';
+
     Widget? leadingWidget = leading;
     if (leadingWidget == null) {
       if (showBack || Navigator.canPop(context)) {
         leadingWidget = IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.forestGreen, size: 24),
+          icon: Icon(Icons.arrow_back, color: iconColor, size: 24),
           onPressed: onBack ?? () => Navigator.pop(context),
         );
       } else if (onOpenDrawer != null) {
         leadingWidget = IconButton(
-          icon: const Icon(Icons.menu, color: AppColors.forestGreen, size: 24),
+          icon: Icon(Icons.menu, color: iconColor, size: 24),
           onPressed: onOpenDrawer,
         );
       }
@@ -69,7 +81,7 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
       if (showSearch) {
         actions.add(
           IconButton(
-            icon: const Icon(Icons.search, color: AppColors.forestGreen, size: 22),
+            icon: Icon(Icons.search, color: iconColor, size: 22),
             onPressed: onSearchTap,
           ),
         );
@@ -85,7 +97,7 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 '$unreadNotifs',
                 style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
               ),
-              child: const Icon(Icons.notifications_none_outlined, color: AppColors.forestGreen, size: 22),
+              child: Icon(Icons.notifications_none_outlined, color: iconColor, size: 22),
             ),
             onPressed: () {
               Navigator.push(
@@ -107,7 +119,7 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 '$cartCount',
                 style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
               ),
-              child: const Icon(Icons.shopping_cart_outlined, color: AppColors.forestGreen, size: 22),
+              child: Icon(Icons.shopping_cart_outlined, color: iconColor, size: 22),
             ),
             onPressed: () {
               Navigator.push(
@@ -122,7 +134,7 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
       if (showSettings) {
         actions.add(
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: AppColors.forestGreen, size: 22),
+            icon: Icon(Icons.settings_outlined, color: iconColor, size: 22),
             onPressed: onSettingsTap,
           ),
         );
@@ -133,22 +145,41 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
       backgroundColor: backgroundColor,
       elevation: 0,
       scrolledUnderElevation: 0,
+      systemOverlayStyle: isDarkHeader
+          ? const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            )
+          : const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+            ),
+      shape: roundedBottom
+          ? const RoundedRectangleBorder(
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(26),
+                bottomRight: Radius.circular(26),
+              ),
+            )
+          : null,
       leading: leadingWidget,
       centerTitle: true,
       title: SizedBox(
         height: 38,
         child: Image.asset(
-          'assets/images/thulirva_brand_logo.png',
+          logoAsset,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.eco, color: AppColors.forestGreen, size: 22),
-              SizedBox(width: 6),
+            children: [
+              Icon(Icons.eco, color: iconColor, size: 22),
+              const SizedBox(width: 6),
               Text(
                 'THULIRVA',
                 style: TextStyle(
-                  color: AppColors.forestGreen,
+                  color: iconColor,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
@@ -162,4 +193,3 @@ class ThulirvaAppBar extends ConsumerWidget implements PreferredSizeWidget {
     );
   }
 }
-

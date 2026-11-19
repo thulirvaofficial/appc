@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../constants/api_endpoints.dart';
+import '../services/connectivity_service.dart';
 import '../storage/storage_service.dart';
 import 'api_exceptions.dart';
 
@@ -60,11 +61,13 @@ class ApiClient {
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.sendTimeout) {
+      ConnectivityService.instance.reportNetworkFailure();
       return TimeoutException();
     }
 
     if (error.error is SocketException ||
         error.type == DioExceptionType.connectionError) {
+      ConnectivityService.instance.reportNetworkFailure();
       return NetworkException();
     }
 

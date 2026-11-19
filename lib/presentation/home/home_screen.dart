@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_colors.dart';
@@ -143,10 +144,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       }
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAF8EF),
-      body: SafeArea(
-        child: RefreshIndicator(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: AppColors.forestGreen,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFAF8EF),
+        body: RefreshIndicator(
           color: AppColors.forestGreen,
           onRefresh: _refresh,
           child: SingleChildScrollView(
@@ -154,9 +162,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Top Forest Green Header Container
+                // 1. Top Forest Green Header Container (Covers status bar seamlessly with 26px bottom curves)
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   decoration: const BoxDecoration(
                     color: AppColors.forestGreen,
                     borderRadius: BorderRadius.only(
@@ -164,42 +171,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       bottomRight: Radius.circular(26),
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      // Top Row: Menu Button, Thulirva Brand Logo & Title, Notifications Bell, Cart Icon
-                      Row(
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Column(
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.menu, color: Colors.white, size: 24),
-                            onPressed: widget.onOpenDrawer,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                          const SizedBox(width: 12),
-                          // Thulirva Brand Logo (Crisp White & Gold on Forest Green)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'assets/images/thulirva_brand_logo_white.png',
-                              height: 36,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '🌿 THULIRVA',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 18,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ],
+                          // Top Row: Menu Button, Thulirva Brand Logo Circular Emblem, Notifications Bell, Cart Icon
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.menu, color: Colors.white, size: 24),
+                                onPressed: widget.onOpenDrawer,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                               ),
-                            ),
-                          ),
-                          const Spacer(),
+                              const SizedBox(width: 12),
+                              // Thulirva Brand Logo (Crisp White & Gold Circular Emblem on Forest Green, No clipping)
+                              Image.asset(
+                                'assets/images/thulirva_brand_logo_white.png',
+                                height: 38,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '🌿 THULIRVA',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 18,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
                           // Notification Bell
                           IconButton(
                             icon: Badge(
@@ -316,6 +324,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     ],
                   ),
                 ),
+              ),
+            ),
 
                 // Coming Soon / Unserviceable Area Banner
                 if (isUnserviceable)
