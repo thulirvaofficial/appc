@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -6,8 +5,12 @@ import '../../core/constants/app_typography.dart';
 import '../../core/services/cart_notification_service.dart';
 import '../../data/models/product_model.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/product_provider.dart';
 import '../cart/cart_screen.dart';
+import '../widgets/product_card.dart';
+import '../widgets/product_image_frame.dart';
 import '../widgets/quantity_selector.dart';
+import 'products_list_screen.dart';
 
 class ProductDetailsScreen extends ConsumerStatefulWidget {
   final ProductModel product;
@@ -100,12 +103,18 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Large Product Image Showcase
+                  // Large Product Image Showcase (Standardized & never cropped)
                   Container(
                     height: 280,
                     width: double.infinity,
-                    color: AppColors.lightCream,
-                    child: _buildImage(p),
+                    color: const Color(0xFFFAF8EF),
+                    child: ProductImageFrame.forProduct(
+                      product: p,
+                      aspectRatio: 16 / 10,
+                      fit: BoxFit.contain,
+                      backgroundColor: const Color(0xFFFAF8EF),
+                      borderRadius: BorderRadius.zero,
+                    ),
                   ),
 
                   Padding(
@@ -407,6 +416,11 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                             ],
                           ),
                         ),
+
+                        const SizedBox(height: 24),
+
+                        // Related Products Section with standardized ProductCard
+                        _buildRelatedProductsSection(context, ref, p),
                       ],
                     ),
                   ),
@@ -506,29 +520,67 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     );
   }
 
-  Widget _buildImage(ProductModel product) {
-    final imgUrl = product.fullImageUrl;
-    if (imgUrl.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: imgUrl,
-        fit: BoxFit.cover,
-        errorWidget: (_, __, ___) => _buildFallbackAsset(product),
-      );
-    }
-    return _buildFallbackAsset(product);
-  }
+  Widget _buildRelatedProductsSection(BuildContext context, WidgetRef ref, ProductModel currentProduct) {
+    final allProducts = ref.watch(productProvider).allProducts;
+    final related = allProducts
+        .where((prod) => prod.id != currentProduct.id && prod.category == currentProduct.category)
+        .toList();
+    final items = related.isNotEmpty
+        ? related
+        : allProducts.where((prod) => prod.id != currentProduct.id).take(6).toList();
 
-  Widget _buildFallbackAsset(ProductModel product) {
-    String assetPath = 'assets/images/products/fresh_cow_milk.jpg';
-    final nameLower = product.name.toLowerCase();
-    if (nameLower.contains('ghee') || nameLower.contains('butter')) {
-      assetPath = 'assets/images/products/pure_cow_ghee.jpg';
-    } else if (nameLower.contains('paneer') || nameLower.contains('tofu')) {
-      assetPath = 'assets/images/products/fresh_paneer.jpg';
-    } else if (nameLower.contains('curd') || nameLower.contains('oil') || nameLower.contains('masala')) {
-      assetPath = 'assets/images/products/product_lineup.jpg';
-    }
+    if (items.isEmpty) return const SizedBox.shrink();
 
-    return Image.asset(assetPath, fit: BoxFit.cover);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Related Products',
+              style: TextStyle(
+                color: AppColors.forestGreen,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProductsListScreen()),
+                );
+              },
+              child: const Text(
+                'View All →',
+                style: TextStyle(
+                  color: AppColors.forestGreen,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length > 4 ? 4 : items.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.72,
+          ),
+          itemBuilder: (context, index) {
+            return ProductCard(product: items[index]);
+          },
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
   }
 }
