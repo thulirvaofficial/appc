@@ -57,6 +57,7 @@ void main() {
     expect(selectedTab, 2);
 
     // 6. Test Try Again Button Tap Interaction
+    expect(retryTapped, isFalse);
     await tester.tap(find.text('Try Again'));
     await tester.pump(); // Start loading
     expect(find.byType(CircularProgressIndicator), findsOneWidget);

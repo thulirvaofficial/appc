@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/models/product_model.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/business_config_provider.dart';
 import '../checkout/checkout_screen.dart';
 import 'apply_coupon_screen.dart';
 
@@ -18,6 +19,14 @@ class CartScreen extends ConsumerStatefulWidget {
 }
 
 class _CartScreenState extends ConsumerState<CartScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(businessConfigProvider.notifier).fetchDeliveryConfig();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartState = ref.watch(cartProvider);

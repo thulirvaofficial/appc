@@ -43,8 +43,8 @@ class BusinessConfigState {
 
   const BusinessConfigState({
     this.deliveryChargesEnabled = true,
-    this.fixedDeliveryCharge = 30.0,
-    this.freeDeliveryThreshold = 299.0,
+    this.fixedDeliveryCharge = 40.0,
+    this.freeDeliveryThreshold = 500.0,
     this.distanceChargesEnabled = false,
     this.distanceBaseKm = 5.0,
     this.distanceRatePerKm = 10.0,

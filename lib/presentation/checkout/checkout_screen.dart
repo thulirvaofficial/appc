@@ -63,6 +63,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void initState() {
     super.initState();
     _fetchDynamicStoresAndLocations();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(businessConfigProvider.notifier).fetchDeliveryConfig();
+    });
   }
 
   Future<void> _fetchDynamicStoresAndLocations() async {
@@ -519,7 +522,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     // Normal product order checkout
     final normalSubtotal = normalItems.fold<double>(0.0, (sum, i) => sum + i.totalPrice);
-    final deliveryFee = isPickup ? 0.0 : (normalSubtotal >= 299 ? 0.0 : cartState.deliveryCharge);
+    final isFreeDelivery = !cartState.deliveryChargesEnabled || normalSubtotal >= cartState.freeDeliveryThreshold;
+    final deliveryFee = isPickup ? 0.0 : (isFreeDelivery ? 0.0 : cartState.deliveryCharge);
     final calculatedGrandTotal = normalSubtotal - cartState.discountAmount + deliveryFee;
 
     final bizConfig = ref.read(businessConfigProvider);
