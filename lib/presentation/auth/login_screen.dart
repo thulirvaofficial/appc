@@ -17,12 +17,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailOrPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailOrPhoneController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -186,6 +188,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
                       obscureText: _obscurePassword,
                       validator: (val) {
                         if (val == null || val.isEmpty) {
@@ -226,11 +229,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final resetEmail = await Navigator.push<String>(
                             context,
                             MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
                           );
+                          if (!mounted) return;
+                          if (resetEmail != null && resetEmail.isNotEmpty) {
+                            _emailOrPhoneController.text = resetEmail;
+                            _passwordController.clear();
+                            _passwordFocusNode.requestFocus();
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Password updated! Please sign in with your new password.'),
+                                backgroundColor: AppColors.forestGreen,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
                         },
                         child: const Text(
                           'Forgot Password?',

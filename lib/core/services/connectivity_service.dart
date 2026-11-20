@@ -19,9 +19,9 @@ class ConnectivityService {
   final Connectivity _connectivity = Connectivity();
   final Dio _probeDio = Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 4),
-      receiveTimeout: const Duration(seconds: 4),
-      sendTimeout: const Duration(seconds: 4),
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 8),
+      sendTimeout: const Duration(seconds: 8),
       headers: {
         'Accept': 'application/json',
       },
@@ -69,14 +69,20 @@ class ConnectivityService {
     final now = DateTime.now();
     // Debounce rapid API errors
     if (_lastFailureReportTime != null &&
-        now.difference(_lastFailureReportTime!).inMilliseconds < 1500) {
+        now.difference(_lastFailureReportTime!).inMilliseconds < 2000) {
       return;
     }
     _lastFailureReportTime = now;
     debugPrint('🚨 [ConnectivityService] Network failure reported from API Client.');
 
-    // Fast check to confirm offline state
-    checkConnection(forceProbe: true);
+    // Only set offline if device has no network interface at all
+    _connectivity.checkConnectivity().then((results) {
+      final hasInterface = results.any((r) => r != ConnectivityResult.none);
+      if (!hasInterface) {
+        _setOnlineStatus(false);
+        _startPeriodicOfflineCheck();
+      }
+    }).catchError((_) {});
   }
 
   /// Probes both generic internet (DNS) and backend /api/health
@@ -85,9 +91,12 @@ class ConnectivityService {
     _isChecking = true;
 
     try {
-      // 1. Check local interface first
+      // 1. Check local network interfaces first
       final results = await _connectivity.checkConnectivity();
-      if (results.contains(ConnectivityResult.none) && results.length == 1) {
+      final hasInterface = results.any((r) => r != ConnectivityResult.none);
+
+      if (!hasInterface) {
+        // Device explicitly has no network interface enabled (Airplane mode or completely off)
         _setOnlineStatus(false);
         _startPeriodicOfflineCheck();
         return false;
@@ -103,27 +112,33 @@ class ConnectivityService {
 
       // 3. Fallback: check general DNS lookup
       final internetOk = await _probeInternetDns();
-      if (!internetOk) {
-        _setOnlineStatus(false);
-        _startPeriodicOfflineCheck();
-        return false;
+      if (internetOk) {
+        _setOnlineStatus(true);
+        _stopPeriodicOfflineCheck();
+        return true;
       }
 
-      // If internet works but backend is unreachable: still considered offline for app functionality
-      _setOnlineStatus(false);
-      _startPeriodicOfflineCheck();
-      return false;
+      // If network interface (Wi-Fi or Mobile) is active, do not hard-lock the customer
+      // into a permanent blocking offline screen; allow UI and retry mechanisms to function
+      _setOnlineStatus(hasInterface);
+      if (!hasInterface) {
+        _startPeriodicOfflineCheck();
+      } else {
+        _stopPeriodicOfflineCheck();
+      }
+      return hasInterface;
     } catch (e) {
       debugPrint('Connectivity check error: $e');
-      _setOnlineStatus(false);
-      _startPeriodicOfflineCheck();
-      return false;
+      // Default to online so that users are not locked out due to probing issues
+      _setOnlineStatus(true);
+      return true;
     } finally {
       _isChecking = false;
     }
   }
 
   Future<bool> _probeBackend() async {
+    // 1. Try primary configured base URL health endpoint
     try {
       final healthUrl = '${ApiEndpoints.baseUrl}/health';
       final response = await _probeDio.get(healthUrl);
@@ -132,16 +147,26 @@ class ConnectivityService {
           response.statusCode! < 300) {
         return true;
       }
-    } catch (_) {
-      // Fallback: try root server or products
-      try {
-        final productsUrl = '${ApiEndpoints.baseUrl}/products';
-        final res = await _probeDio.get(productsUrl);
-        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 400) {
-          return true;
-        }
-      } catch (_) {}
-    }
+    } catch (_) {}
+
+    // 2. Fallback: try primary products endpoint
+    try {
+      final productsUrl = '${ApiEndpoints.baseUrl}/products';
+      final res = await _probeDio.get(productsUrl);
+      if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 400) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 3. Fallback: try localhost / adb reverse daemon if running
+    try {
+      final localHealth = 'http://localhost:5500/api/health';
+      final res = await _probeDio.get(localHealth);
+      if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+        return true;
+      }
+    } catch (_) {}
+
     return false;
   }
 
@@ -152,15 +177,16 @@ class ConnectivityService {
       if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
         return true;
       }
-    } catch (_) {
-      try {
-        final result = await InternetAddress.lookup('8.8.8.8')
-            .timeout(const Duration(seconds: 3));
-        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-          return true;
-        }
-      } catch (_) {}
-    }
+    } catch (_) {}
+
+    try {
+      final result = await InternetAddress.lookup('cloudflare.com')
+          .timeout(const Duration(seconds: 3));
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        return true;
+      }
+    } catch (_) {}
+
     return false;
   }
 

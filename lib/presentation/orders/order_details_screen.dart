@@ -8,6 +8,7 @@ import '../../core/constants/app_dimensions.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/utils/id_formatter.dart';
 import '../../data/models/order_model.dart';
+import '../../providers/api_provider.dart';
 import '../../providers/order_provider.dart';
 import 'customer_live_tracking_screen.dart';
 import '../widgets/thulirva_delivery_proof_widget.dart';
@@ -37,6 +38,10 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   ];
 
   Timer? _statusPollingTimer;
+  int? _selectedTipAmount = 30;
+  final TextEditingController _customTipController = TextEditingController();
+  bool _isSubmittingTip = false;
+  Map<String, dynamic>? _existingTip;
 
   @override
   void initState() {
@@ -44,6 +49,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     _currentOrder = widget.order;
     if (_currentOrder.orderStatus.toLowerCase() == 'delivered') {
       _loadDeliveryDetails();
+      _loadTipDetails();
     }
     _startLiveStatusPolling();
   }
@@ -89,6 +95,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   void dispose() {
     _statusPollingTimer?.cancel();
     _feedbackController.dispose();
+    _customTipController.dispose();
     super.dispose();
   }
 
@@ -455,6 +462,12 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             // PARTNER RATING CARD (When Delivered)
             if (isDelivered) ...[
               _buildPartnerRatingCard(order),
+              const SizedBox(height: 16),
+            ],
+
+            // TIP DELIVERY PARTNER CARD (When Delivered)
+            if (isDelivered && !isPickup) ...[
+              _buildTipPartnerCard(order),
               const SizedBox(height: 16),
             ],
 
@@ -1200,6 +1213,231 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
                       ),
               ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadTipDetails() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('/tips/order/${_currentOrder.id}');
+      if (res.data != null && res.data['tip'] != null && mounted) {
+        setState(() {
+          _existingTip = res.data['tip'];
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _submitTip(OrderModel order) async {
+    final amount = _selectedTipAmount ?? int.tryParse(_customTipController.text.trim()) ?? 0;
+    if (amount <= 0) return;
+
+    setState(() => _isSubmittingTip = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.post('/tips', data: {
+        'order_id': order.id,
+        'tip_amount': amount,
+        'payment_method': 'upi',
+        'idempotency_key': 'tip_${order.id}_${DateTime.now().millisecondsSinceEpoch}',
+      });
+
+      if (mounted) {
+        setState(() {
+          _isSubmittingTip = false;
+          if (res.data != null && res.data['tip'] != null) {
+            _existingTip = res.data['tip'];
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.forestGreen,
+            content: Text('✓ Thank you! ₹$amount tip sent to your delivery partner ❤️'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmittingTip = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text('Failed to process tip: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildTipPartnerCard(OrderModel order) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        border: Border.all(color: const Color(0xFFE5EDE2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.favorite_rounded, color: Color(0xFFDC2626), size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Thank your delivery partner ❤️',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.forestGreen),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (_existingTip != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'You tipped ₹${_existingTip!['tip_amount']} to your delivery partner',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF166534)),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          '100% of this tip was credited directly to the partner. Thank you!',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF15803D)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const Text(
+              'Your tip goes directly to the delivery partner who brought your fresh farm products.',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF4B5563), height: 1.35),
+            ),
+            const SizedBox(height: 14),
+
+            // Suggested Tip Chips (₹10, ₹20, ₹30, ₹50, ₹100)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [10, 20, 30, 50, 100].map((amt) {
+                final isSelected = _selectedTipAmount == amt;
+                return ChoiceChip(
+                  label: Text('₹$amt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isSelected ? Colors.white : AppColors.forestGreen)),
+                  selected: isSelected,
+                  selectedColor: AppColors.forestGreen,
+                  backgroundColor: const Color(0xFFF0FDF4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  side: BorderSide(color: isSelected ? AppColors.forestGreen : const Color(0xFF86EFAC)),
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedTipAmount = selected ? amt : null;
+                      _customTipController.clear();
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+
+            // Custom Amount Row
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _customTipController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      prefixText: '₹ ',
+                      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark),
+                      hintText: 'Custom Amount',
+                      hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF9CA3AF)),
+                      filled: true,
+                      fillColor: const Color(0xFFF9FAFB),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.forestGreen)),
+                    ),
+                    onChanged: (val) {
+                      final n = int.tryParse(val.trim());
+                      if (n != null && n > 0) {
+                        setState(() => _selectedTipAmount = n);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: (_isSubmittingTip || (_selectedTipAmount ?? 0) <= 0) ? null : () => _submitTip(order),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.forestGreen,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  child: _isSubmittingTip
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text(
+                          _selectedTipAmount != null && _selectedTipAmount! > 0 ? 'Pay ₹$_selectedTipAmount' : 'Tip Partner',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '100% of your tip goes to your partner',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedTipAmount = null;
+                      _customTipController.clear();
+                    });
+                  },
+                  child: const Text('Not now', style: TextStyle(fontSize: 11.5, color: Colors.grey)),
+                ),
+              ],
             ),
           ],
         ],
