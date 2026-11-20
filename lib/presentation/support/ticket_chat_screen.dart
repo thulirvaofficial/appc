@@ -127,6 +127,63 @@ class _TicketChatScreenState extends State<TicketChatScreen> {
     }
   }
 
+  Future<void> _reopenTicket() async {
+    final reasonController = TextEditingController();
+    final shouldReopen = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reopen Support Ticket', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please describe why you would like to reopen this ticket:', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                hintText: 'Enter reason...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.forestGreen),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reopen', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReopen != true) return;
+
+    try {
+      final res = await _apiClient.dio.post(
+        'support/tickets/${widget.ticketId}/reopen',
+        data: {'reason': reasonController.text.trim()},
+      );
+      if (res.data != null && res.data['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Support ticket reopened successfully.')),
+          );
+        }
+        await _loadTicketDetails();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to reopen ticket: $e')),
+        );
+      }
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'NEW':
@@ -263,6 +320,35 @@ class _TicketChatScreenState extends State<TicketChatScreen> {
                   IconButton(
                     icon: const Icon(Icons.close, size: 18, color: Colors.grey),
                     onPressed: () => setState(() => _selectedImage = null),
+                  ),
+                ],
+              ),
+            ),
+
+          // Reopen Prompt Banner if resolved/closed
+          if (status.toUpperCase() == 'RESOLVED' || status.toUpperCase() == 'CLOSED')
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: const Color(0xFFFEF3C7),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 18, color: Color(0xFF92400E)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'This ticket is closed. Still having issues?',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _reopenTicket,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF92400E),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: const Size(60, 30),
+                    ),
+                    child: const Text('Reopen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ],
               ),

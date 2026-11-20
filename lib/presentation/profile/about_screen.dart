@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../core/constants/app_typography.dart';
@@ -140,9 +141,81 @@ class AboutScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   _buildInfoRow(Icons.access_time_outlined, 'Store Timings:', '7:00 AM – 8:00 PM (All 7 Days)'),
                   const SizedBox(height: 12),
-                  _buildInfoRow(Icons.phone_outlined, 'Customer Care:', '+91 93606 71533'),
+                  _buildClickableRow(
+                    context,
+                    Icons.phone_outlined,
+                    'Customer Care:',
+                    '+91 93606 71533',
+                    'tel:+919360671533',
+                  ),
                   const SizedBox(height: 12),
-                  _buildInfoRow(Icons.email_outlined, 'Email Support:', 'support@thulirva.com'),
+                  _buildClickableRow(
+                    context,
+                    Icons.email_outlined,
+                    'Email Support:',
+                    'support@thulirva.com',
+                    'mailto:support@thulirva.com',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClickableRow(BuildContext context, IconData icon, String title, String value, String urlString) {
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(urlString);
+        try {
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            await launchUrl(uri);
+          }
+        } catch (_) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open: $value')),
+            );
+          }
+        }
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: AppColors.forestGreen, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textDark),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.open_in_new, size: 13, color: AppColors.forestGreen),
+                    ],
+                  ),
                 ],
               ),
             ),

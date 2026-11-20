@@ -67,14 +67,35 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String? _paymentProofBase64;
   final ImagePicker _picker = ImagePicker();
   String _paymentMode = 'UPI';
+  bool _isCustomerCodEligible = true;
+  String? _customerCodRestrictionReason;
 
   @override
   void initState() {
     super.initState();
     _fetchDynamicStoresAndLocations();
+    _checkCustomerCodEligibility();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(businessConfigProvider.notifier).fetchDeliveryConfig();
     });
+  }
+
+  Future<void> _checkCustomerCodEligibility() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final res = await api.get('cod-status');
+      if (res.data != null && res.data['success'] == true) {
+        if (mounted) {
+          setState(() {
+            _isCustomerCodEligible = res.data['eligible'] != false;
+            _customerCodRestrictionReason = res.data['reason']?.toString();
+            if (!_isCustomerCodEligible && _paymentMode == 'COD') {
+              _paymentMode = 'UPI';
+            }
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchDynamicStoresAndLocations() async {
@@ -332,7 +353,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         i.product.name.toLowerCase().contains('(30 days plan)') ||
         i.product.name.toLowerCase().contains('subscription plan'));
 
-    if ((hasSubscriptions || !bizConfig.codEnabled) && _paymentMode == 'COD') {
+    if ((hasSubscriptions || !bizConfig.codEnabled || !_isCustomerCodEligible) && _paymentMode == 'COD') {
       _paymentMode = 'UPI';
     }
 
@@ -401,7 +422,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final isCod = _paymentMode == 'COD' && !hasSubscriptions && bizConfig.codEnabled;
+    final isCod = _paymentMode == 'COD' && !hasSubscriptions && bizConfig.codEnabled && _isCustomerCodEligible;
     final utrText = _utrController.text.trim();
 
     if (!isCod) {
@@ -650,7 +671,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         i.product.name.toLowerCase().contains('(30 days plan)') ||
         i.product.name.toLowerCase().contains('subscription plan'));
 
-    if ((hasSubscriptions || !bizConfig.codEnabled) && _paymentMode == 'COD') {
+    if ((hasSubscriptions || !bizConfig.codEnabled || !_isCustomerCodEligible) && _paymentMode == 'COD') {
       _paymentMode = 'UPI';
     }
 
@@ -1344,91 +1365,108 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               const SizedBox(height: 10),
 
                               // Option 2: Cash on Delivery (COD)
-                              InkWell(
-                                onTap: (hasSubscriptions || !bizConfig.codEnabled)
-                                    ? () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              hasSubscriptions
-                                                  ? 'Milk Subscriptions require 100% online advance payment via UPI.'
-                                                  : 'Cash on Delivery is temporarily disabled storewide. Please pay online via UPI.',
-                                            ),
-                                            backgroundColor: const Color(0xFFB45309),
-                                            duration: const Duration(seconds: 3),
-                                          ),
-                                        );
-                                      }
-                                    : () => setState(() => _paymentMode = 'COD'),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: _paymentMode == 'COD' ? const Color(0xFFFFFBEB) : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _paymentMode == 'COD'
-                                          ? const Color(0xFFD97706)
-                                          : (hasSubscriptions || !bizConfig.codEnabled ? Colors.grey.shade200 : const Color(0xFFE5EDE2)),
-                                      width: _paymentMode == 'COD' ? 1.5 : 1.0,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Radio<String>(
-                                        value: 'COD',
-                                        activeColor: const Color(0xFFD97706),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  'Cash on Delivery (COD)',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 13,
-                                                    color: (hasSubscriptions || !bizConfig.codEnabled)
-                                                        ? Colors.grey
-                                                        : const Color(0xFF92400E),
-                                                  ),
-                                                ),
-                                                if (hasSubscriptions || !bizConfig.codEnabled) ...[
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.grey.shade100,
-                                                      borderRadius: BorderRadius.circular(4),
-                                                    ),
-                                                    child: const Text(
-                                                      'Unavailable',
-                                                      style: TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.bold),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                            Text(
-                                              hasSubscriptions
-                                                  ? 'Milk subscriptions require online payment'
-                                                  : (!bizConfig.codEnabled
-                                                      ? 'Disabled storewide by admin'
-                                                      : 'Pay cash to delivery executive at doorstep'),
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: (hasSubscriptions || !bizConfig.codEnabled) ? Colors.grey : const Color(0xFFB45309),
+                              Builder(
+                                builder: (context) {
+                                  final bool isCodBlocked = hasSubscriptions || !bizConfig.codEnabled || !_isCustomerCodEligible;
+                                  return InkWell(
+                                    onTap: isCodBlocked
+                                        ? () {
+                                            String msg = 'Cash on Delivery is currently unavailable.';
+                                            if (hasSubscriptions) {
+                                              msg = 'Milk Subscriptions require 100% online advance payment via UPI.';
+                                            } else if (!_isCustomerCodEligible) {
+                                              msg = _customerCodRestrictionReason ?? 'Cash on Delivery is temporarily disabled for your account due to repeated doorstep refusals. Please pay via UPI.';
+                                            } else if (!bizConfig.codEnabled) {
+                                              msg = 'Cash on Delivery is temporarily disabled storewide. Please pay online via UPI.';
+                                            }
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(msg),
+                                                backgroundColor: const Color(0xFFB45309),
+                                                duration: const Duration(seconds: 4),
                                               ),
-                                            ),
-                                          ],
+                                            );
+                                          }
+                                        : () => setState(() => _paymentMode = 'COD'),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: _paymentMode == 'COD' ? const Color(0xFFFFFBEB) : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: _paymentMode == 'COD'
+                                              ? const Color(0xFFD97706)
+                                              : (isCodBlocked ? Colors.grey.shade200 : const Color(0xFFE5EDE2)),
+                                          width: _paymentMode == 'COD' ? 1.5 : 1.0,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
+                                      child: Row(
+                                        children: [
+                                          Radio<String>(
+                                            value: 'COD',
+                                            groupValue: _paymentMode,
+                                            onChanged: isCodBlocked ? null : (v) => setState(() => _paymentMode = 'COD'),
+                                            activeColor: const Color(0xFFD97706),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      'Cash on Delivery (COD)',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 13,
+                                                        color: isCodBlocked
+                                                            ? Colors.grey
+                                                            : const Color(0xFF92400E),
+                                                      ),
+                                                    ),
+                                                    if (isCodBlocked) ...[
+                                                      const SizedBox(width: 8),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: !_isCustomerCodEligible ? const Color(0xFFFEE2E2) : Colors.grey.shade100,
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          !_isCustomerCodEligible ? 'Disabled' : 'Unavailable',
+                                                          style: TextStyle(
+                                                            fontSize: 9.5,
+                                                            color: !_isCustomerCodEligible ? const Color(0xFF991B1B) : Colors.grey,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                                Text(
+                                                  hasSubscriptions
+                                                      ? 'Milk subscriptions require online payment'
+                                                      : (!_isCustomerCodEligible
+                                                          ? (_customerCodRestrictionReason ?? 'Unavailable due to previous unaccepted deliveries')
+                                                          : (!bizConfig.codEnabled
+                                                              ? 'Disabled storewide by admin'
+                                                              : 'Pay cash to delivery executive at doorstep')),
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isCodBlocked ? Colors.grey : const Color(0xFFB45309),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
