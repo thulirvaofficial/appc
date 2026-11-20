@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/notification_model.dart';
+import '../../data/models/subscription_model.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../orders/my_orders_screen.dart';
 import '../orders/order_details_screen.dart';
 import '../profile/offers_screen.dart';
+import '../subscriptions/customer_subscription_details_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../widgets/thulirva_app_bar.dart';
 
@@ -33,13 +36,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     Future.microtask(() => ref.read(notificationProvider.notifier).fetchNotifications());
   }
 
-  void _handleDeepLink(_VisualNotif notif) {
+  Future<void> _handleDeepLink(_VisualNotif notif) async {
     ref.read(notificationProvider.notifier).markAsRead(notif.id);
 
     final cat = notif.category.toLowerCase();
     if (cat.contains('order')) {
       final orders = ref.read(orderProvider).orders;
-      if (orders.isNotEmpty) {
+      final targetId = notif.targetId;
+      if (targetId != null && orders.any((o) => o.id == targetId)) {
+        final order = orders.firstWhere((o) => o.id == targetId);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
+        );
+      } else if (orders.isNotEmpty) {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: orders.first)),
@@ -51,10 +61,63 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         );
       }
     } else if (cat.contains('sub')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SubscriptionsScreen()),
-      );
+      final subId = notif.targetId ??
+          notif.data?['subscription_id']?.toString() ??
+          notif.data?['target_id']?.toString();
+
+      // Ensure fresh subscriptions
+      await ref.read(subscriptionProvider.notifier).fetchSubscriptions();
+      final currentSubs = ref.read(subscriptionProvider).subscriptions;
+
+      SubscriptionModel? matchedSub;
+      if (subId != null && subId.isNotEmpty) {
+        matchedSub = currentSubs.cast<SubscriptionModel?>().firstWhere(
+          (s) {
+            if (s == null) return false;
+            final sId = s.id.toLowerCase();
+            final target = subId.toLowerCase();
+            return sId == target ||
+                sId == 'sub-$target' ||
+                target == 'sub-$sId' ||
+                sId.replaceAll('sub-', '') == target.replaceAll('sub-', '');
+          },
+          orElse: () => null,
+        );
+      }
+
+      if (!mounted) return;
+
+      if (matchedSub != null) {
+        // Push SubscriptionsScreen with My Subscriptions tab (index 1), then push Details
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const SubscriptionsScreen(initialTabIndex: 1),
+          ),
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CustomerSubscriptionDetailsScreen(subscription: matchedSub!),
+          ),
+        );
+      } else {
+        if (subId != null && subId.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Subscription #$subId could not be found or has ended.'),
+              backgroundColor: AppColors.forestGreen,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const SubscriptionsScreen(initialTabIndex: 1),
+          ),
+        );
+      }
     } else if (cat.contains('offer')) {
       Navigator.push(
         context,
@@ -118,8 +181,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       }
     } catch (_) {}
 
+    final tId = model.targetId ??
+        model.data?['subscription_id']?.toString() ??
+        model.data?['target_id']?.toString() ??
+        model.data?['order_id']?.toString();
+
     return _VisualNotif(
       id: model.id,
+      targetId: tId,
+      data: model.data,
       section: section,
       title: model.title,
       message: model.message,
@@ -460,6 +530,8 @@ class _NotifFilter {
 
 class _VisualNotif {
   final String id;
+  final String? targetId;
+  final Map<String, dynamic>? data;
   final String section;
   final String title;
   final String message;
@@ -473,6 +545,8 @@ class _VisualNotif {
 
   _VisualNotif({
     required this.id,
+    this.targetId,
+    this.data,
     required this.section,
     required this.title,
     required this.message,

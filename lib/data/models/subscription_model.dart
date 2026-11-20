@@ -144,9 +144,15 @@ class SubscriptionModel {
   final double pricePerDelivery;
   final double totalPrice;
   final String startDate;
+  final String? endDate;
   final String? expiryDate;
   final String? nextRenewalDate;
   final int daysRemaining;
+  final int totalDuration;
+  final int elapsedDays;
+  final int completedDeliveries;
+  final int totalDeliveries;
+  final int remainingDeliveries;
   final String address;
   final String paymentStatus;
   final String status;
@@ -181,9 +187,15 @@ class SubscriptionModel {
     required this.pricePerDelivery,
     required this.totalPrice,
     required this.startDate,
+    this.endDate,
     this.expiryDate,
     this.nextRenewalDate,
     this.daysRemaining = 30,
+    this.totalDuration = 30,
+    this.elapsedDays = 0,
+    this.completedDeliveries = 0,
+    this.totalDeliveries = 30,
+    this.remainingDeliveries = 30,
     required this.address,
     this.paymentStatus = 'Pending',
     this.status = 'Active',
@@ -209,9 +221,15 @@ class SubscriptionModel {
     double? pricePerDelivery,
     double? totalPrice,
     String? startDate,
+    String? endDate,
     String? expiryDate,
     String? nextRenewalDate,
     int? daysRemaining,
+    int? totalDuration,
+    int? elapsedDays,
+    int? completedDeliveries,
+    int? totalDeliveries,
+    int? remainingDeliveries,
     String? address,
     String? paymentStatus,
     String? status,
@@ -236,9 +254,15 @@ class SubscriptionModel {
       pricePerDelivery: pricePerDelivery ?? this.pricePerDelivery,
       totalPrice: totalPrice ?? this.totalPrice,
       startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
       expiryDate: expiryDate ?? this.expiryDate,
       nextRenewalDate: nextRenewalDate ?? this.nextRenewalDate,
       daysRemaining: daysRemaining ?? this.daysRemaining,
+      totalDuration: totalDuration ?? this.totalDuration,
+      elapsedDays: elapsedDays ?? this.elapsedDays,
+      completedDeliveries: completedDeliveries ?? this.completedDeliveries,
+      totalDeliveries: totalDeliveries ?? this.totalDeliveries,
+      remainingDeliveries: remainingDeliveries ?? this.remainingDeliveries,
       address: address ?? this.address,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       status: status ?? this.status,
@@ -252,28 +276,40 @@ class SubscriptionModel {
 
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) {
     final startStr = json['start_date'] ?? json['startDate'] ?? DateTime.now().toString().split(' ')[0];
-    DateTime? startDateObj;
-    try {
-      startDateObj = DateTime.tryParse(startStr);
-    } catch (_) {}
+    final endStr = json['end_date'] ?? json['endDate'] ?? json['expiry_date'] ?? json['expiryDate'];
 
-    final int duration = int.tryParse(json['duration_days']?.toString() ?? '') ?? (json['time_period']?.toString().contains('15') == true ? 15 : 30);
-    DateTime? expiryDateObj;
-    if (json['expiry_date'] != null && json['expiry_date'].toString().isNotEmpty) {
-      expiryDateObj = DateTime.tryParse(json['expiry_date'].toString());
-    } else if (startDateObj != null) {
-      expiryDateObj = startDateObj.add(Duration(days: duration));
-    }
+    final int duration = SafeParseUtil.toInt(
+      json['total_duration'] ?? json['totalDuration'] ?? json['duration_days'] ?? json['durationDays'] ?? json['total_days'],
+      json['time_period']?.toString().contains('15') == true ? 15 : 30,
+    );
 
     int remaining = 0;
-    if (expiryDateObj != null) {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final expiryOnly = DateTime(expiryDateObj.year, expiryDateObj.month, expiryDateObj.day);
-      remaining = expiryOnly.difference(today).inDays;
+    if (json['remaining_days'] != null || json['remainingDays'] != null) {
+      remaining = SafeParseUtil.toInt(json['remaining_days'] ?? json['remainingDays'], 0);
+    } else if (endStr != null && endStr.toString().isNotEmpty) {
+      final expiryDateObj = DateTime.tryParse(endStr.toString());
+      if (expiryDateObj != null) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final expiryOnly = DateTime(expiryDateObj.year, expiryDateObj.month, expiryDateObj.day);
+        remaining = expiryOnly.difference(today).inDays;
+      }
+    } else {
+      remaining = duration;
     }
 
-    final expiryFormatted = expiryDateObj != null ? expiryDateObj.toString().split(' ')[0] : null;
+    final int elapsed = SafeParseUtil.toInt(json['elapsed_days'] ?? json['elapsedDays'], 0);
+    final int completedDels = SafeParseUtil.toInt(json['completed_deliveries'] ?? json['completedDeliveries'], 0);
+    final int totalDels = SafeParseUtil.toInt(
+      json['total_deliveries'] ?? json['totalDeliveries'] ?? json['total_scheduled_deliveries'],
+      duration,
+    );
+    final int remDels = SafeParseUtil.toInt(
+      json['remaining_deliveries'] ?? json['remainingDeliveries'],
+      (totalDels - completedDels).clamp(0, totalDels),
+    );
+
+    final finalExpiry = (endStr ?? '').toString().isNotEmpty ? endStr.toString().split(' ')[0] : null;
 
     return SubscriptionModel(
       id: json['id']?.toString() ?? '',
@@ -290,9 +326,15 @@ class SubscriptionModel {
       pricePerDelivery: SafeParseUtil.toDouble(json['price_per_delivery'], 44.0),
       totalPrice: SafeParseUtil.toDouble(json['total_price'] ?? json['totalPrice']),
       startDate: startStr,
-      expiryDate: expiryFormatted,
-      nextRenewalDate: json['next_renewal_date'] ?? json['nextRenewalDate'] ?? expiryFormatted,
+      endDate: finalExpiry,
+      expiryDate: finalExpiry,
+      nextRenewalDate: json['next_renewal_date'] ?? json['nextRenewalDate'] ?? finalExpiry,
       daysRemaining: remaining,
+      totalDuration: duration,
+      elapsedDays: elapsed,
+      completedDeliveries: completedDels,
+      totalDeliveries: totalDels,
+      remainingDeliveries: remDels,
       address: json['address'] ?? '',
       paymentStatus: json['payment_status'] ?? json['paymentStatus'] ?? 'Pending',
       status: json['status'] ?? 'Active',
@@ -355,8 +397,16 @@ class SubscriptionModel {
       'price_per_delivery': pricePerDelivery,
       'total_price': totalPrice,
       'start_date': startDate,
+      'end_date': endDate,
       'expiry_date': expiryDate,
       'next_renewal_date': nextRenewalDate,
+      'days_remaining': daysRemaining,
+      'remaining_days': daysRemaining,
+      'total_duration': totalDuration,
+      'elapsed_days': elapsedDays,
+      'completed_deliveries': completedDeliveries,
+      'total_deliveries': totalDeliveries,
+      'remaining_deliveries': remainingDeliveries,
       'address': address,
       'payment_status': paymentStatus,
       'status': status,
