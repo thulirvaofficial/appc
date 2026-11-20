@@ -130,14 +130,17 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       );
     } on DioException catch (e) {
       // Even if network returned error or generic message
-      final msg = e.response?.data?['message'] ?? 'If an account exists with this email address, a verification code has been sent.';
+      String msg = e.response?.data?['message']?.toString() ?? 'If an account exists with this email address, a verification code has been sent.';
+      if (msg.contains('Relay') || msg.contains('SMTP') || msg.contains('Postfix') || msg.contains('454') || msg.contains('554') || msg.contains('rejected') || msg.contains('denied')) {
+        msg = 'Unable to send your verification code right now. Please try again in a few minutes.';
+      }
       _userEmail = email;
       setState(() {
         _currentStep = 1;
         _isExpired = false;
       });
       _startTimers(cooldownSeconds: 60, expirySeconds: 300);
-      _showSnackBar(msg);
+      _showSnackBar(msg, isError: msg.contains('Unable to send'));
     } catch (_) {
       _showSnackBar('Network error while requesting verification code. Please try again.', isError: true);
     } finally {
@@ -214,7 +217,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         _otpFocusNodes[0].requestFocus();
       }
     } on DioException catch (e) {
-      final msg = e.response?.data?['message'] ?? 'Could not resend code. Please wait.';
+      String msg = e.response?.data?['message']?.toString() ?? 'Could not resend code. Please wait.';
+      if (msg.contains('Relay') || msg.contains('SMTP') || msg.contains('Postfix') || msg.contains('454') || msg.contains('554') || msg.contains('rejected') || msg.contains('denied')) {
+        msg = 'Unable to send your verification code right now. Please try again in a few minutes.';
+      }
       _showSnackBar(msg, isError: true);
     } catch (_) {
       _showSnackBar('Network error while resending verification code.', isError: true);
