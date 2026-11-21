@@ -8,6 +8,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/business_config_provider.dart';
 import '../checkout/checkout_screen.dart';
 import 'apply_coupon_screen.dart';
+import 'tip_section_widget.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   final VoidCallback? onContinueShopping;
@@ -58,6 +59,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
                         // Apply Coupon Section
                         _buildCouponCard(cartState, cartNotifier),
+                        const SizedBox(height: 14),
+
+                        // Tip Your Delivery Partner Section
+                        const TipSectionWidget(),
                         const SizedBox(height: 14),
 
                         // Free Delivery Progress Banner (Dynamic threshold)
@@ -604,6 +609,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   const SizedBox(height: 10),
                   _buildSummaryLine('Discount', '- ₹${state.discountAmount.toStringAsFixed(0)}', isDiscount: true),
                 ],
+                if (state.tipAmount > 0) ...[
+                  const SizedBox(height: 10),
+                  _buildSummaryLine('Tip for Partner 💚', '+ ₹${state.tipAmount.toStringAsFixed(0)}', isTip: true),
+                ],
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Divider(color: Color(0xFFE5EDE2), height: 1),
@@ -629,7 +638,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     );
   }
 
-  Widget _buildSummaryLine(String label, String value, {bool isFree = false, bool isDiscount = false, bool showInfo = false}) {
+  Widget _buildSummaryLine(String label, String value, {bool isFree = false, bool isDiscount = false, bool isTip = false, bool showInfo = false}) {
     return Row(
       children: [
         Expanded(
@@ -657,7 +666,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: (isFree || isDiscount) ? const Color(0xFF2E7D32) : AppColors.forestGreen,
+            color: (isFree || isDiscount || isTip) ? const Color(0xFF2E7D32) : AppColors.forestGreen,
           ),
         ),
       ],

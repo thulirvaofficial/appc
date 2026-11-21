@@ -575,7 +575,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final normalSubtotal = normalItems.fold<double>(0.0, (sum, i) => sum + i.totalPrice);
     final isFreeDelivery = !cartState.deliveryChargesEnabled || normalSubtotal >= cartState.freeDeliveryThreshold;
     final deliveryFee = isPickup ? 0.0 : (isFreeDelivery ? 0.0 : cartState.deliveryCharge);
-    final calculatedGrandTotal = normalSubtotal - cartState.discountAmount + deliveryFee;
+    final tipAmount = cartState.tipAmount;
+    final calculatedGrandTotal = normalSubtotal - cartState.discountAmount + deliveryFee + tipAmount;
 
     final bizConfig = ref.read(businessConfigProvider);
     final activeUpiId = bizConfig.upiId.isNotEmpty ? bizConfig.upiId : '7904880944@superyes';
@@ -616,6 +617,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'delivery_charge': deliveryFee,
       'discount_amount': cartState.discountAmount,
       'promo_code': cartState.appliedCouponCode,
+      'tip_amount': tipAmount,
+      'tipAmount': tipAmount,
       'total': calculatedGrandTotal,
       'total_price': calculatedGrandTotal,
       'payment_method': isCod ? 'Cash on Delivery (COD)' : 'UPI QR ($activeUpiId)',
@@ -679,7 +682,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         (addressState.addresses.isNotEmpty ? addressState.addresses.first : null);
 
     final deliveryFee = isPickup ? 0.0 : cartState.deliveryCharge;
-    final calculatedGrandTotal = cartState.subtotal - cartState.discountAmount + deliveryFee;
+    final calculatedGrandTotal = cartState.subtotal - cartState.discountAmount + deliveryFee + cartState.tipAmount;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7EE),
@@ -1785,6 +1788,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             children: [
                               Text('Promo Discount (${cartState.appliedCouponCode})', style: const TextStyle(color: AppColors.naturalGreen, fontSize: 12)),
                               Text('-₹${cartState.discountAmount.toStringAsFixed(0)}', style: const TextStyle(color: AppColors.naturalGreen, fontWeight: FontWeight.w700, fontSize: 12)),
+                            ],
+                          ),
+                        ],
+                        if (cartState.tipAmount > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Tip for Partner 💚', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 12)),
+                              Text('+₹${cartState.tipAmount.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w700, fontSize: 12)),
                             ],
                           ),
                         ],

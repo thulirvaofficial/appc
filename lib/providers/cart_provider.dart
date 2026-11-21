@@ -17,6 +17,8 @@ class CartState {
   final double fixedDeliveryCharge;
   final double freeDeliveryThreshold;
   final bool deliveryChargesEnabled;
+  final double tipAmount;
+  final bool isCustomTip;
 
   CartState({
     this.items = const [],
@@ -28,6 +30,8 @@ class CartState {
     this.fixedDeliveryCharge = 40.0,
     this.freeDeliveryThreshold = 500.0,
     this.deliveryChargesEnabled = true,
+    this.tipAmount = 0.0,
+    this.isCustomTip = false,
   });
 
   int get totalItemCount => items.fold(0, (sum, i) => sum + i.quantity);
@@ -42,7 +46,7 @@ class CartState {
   }
 
   double get grandTotal {
-    final raw = subtotal - discountAmount + deliveryCharge;
+    final raw = subtotal - discountAmount + deliveryCharge + tipAmount;
     return raw > 0.0 ? raw : 0.0;
   }
 
@@ -56,6 +60,8 @@ class CartState {
     double? fixedDeliveryCharge,
     double? freeDeliveryThreshold,
     bool? deliveryChargesEnabled,
+    double? tipAmount,
+    bool? isCustomTip,
   }) {
     return CartState(
       items: items ?? this.items,
@@ -67,12 +73,16 @@ class CartState {
       fixedDeliveryCharge: fixedDeliveryCharge ?? this.fixedDeliveryCharge,
       freeDeliveryThreshold: freeDeliveryThreshold ?? this.freeDeliveryThreshold,
       deliveryChargesEnabled: deliveryChargesEnabled ?? this.deliveryChargesEnabled,
+      tipAmount: tipAmount ?? this.tipAmount,
+      isCustomTip: isCustomTip ?? this.isCustomTip,
     );
   }
 }
 
 class CartNotifier extends StateNotifier<CartState> {
   final Ref ref;
+  bool _isCouponOpInProgress = false;
+  bool _isRevalidating = false;
 
   CartNotifier(this.ref) : super(CartState()) {
     final biz = ref.read(businessConfigProvider);
@@ -142,6 +152,8 @@ class CartNotifier extends StateNotifier<CartState> {
       discountAmount: 0.0,
       appliedCouponCode: null,
       couponMessage: null,
+      tipAmount: 0.0,
+      isCustomTip: false,
     );
   }
 
@@ -231,6 +243,9 @@ class CartNotifier extends StateNotifier<CartState> {
       removeCoupon();
       return;
     }
+    // Skip revalidation if a coupon operation is in progress or already revalidating
+    if (_isCouponOpInProgress || _isRevalidating) return;
+    _isRevalidating = true;
 
     ref.read(apiClientProvider).post(
       ApiEndpoints.validateCoupon,
@@ -249,13 +264,17 @@ class CartNotifier extends StateNotifier<CartState> {
       }
     }).catchError((_) {
       if (state.subtotal <= 0) removeCoupon();
+    }).whenComplete(() {
+      _isRevalidating = false;
     });
   }
 
   Future<bool> applyCoupon(String code) async {
     final clean = code.trim().toUpperCase();
     if (clean.isEmpty) return false;
+    if (_isCouponOpInProgress) return false;
 
+    _isCouponOpInProgress = true;
     state = state.copyWith(isApplyingCoupon: true, couponMessage: null);
     try {
       final api = ref.read(apiClientProvider);
@@ -298,15 +317,35 @@ class CartNotifier extends StateNotifier<CartState> {
         isApplyingCoupon: false,
       );
       return false;
+    } finally {
+      _isCouponOpInProgress = false;
     }
   }
 
   void removeCoupon() {
+    _isCouponOpInProgress = false;
     state = state.copyWith(
       discountAmount: 0.0,
       appliedCouponCode: null,
       couponMessage: null,
+      isApplyingCoupon: false,
     );
+  }
+
+  void setTip(double amount) {
+    // Clamp between 0 and 500
+    final clamped = amount.clamp(0.0, 500.0);
+    state = state.copyWith(tipAmount: clamped, isCustomTip: false);
+  }
+
+  void setCustomTip(double amount) {
+    if (amount < 0 || amount > 500) return;
+    final rounded = (amount * 100).roundToDouble() / 100;
+    state = state.copyWith(tipAmount: rounded, isCustomTip: true);
+  }
+
+  void removeTip() {
+    state = state.copyWith(tipAmount: 0.0, isCustomTip: false);
   }
 }
 
