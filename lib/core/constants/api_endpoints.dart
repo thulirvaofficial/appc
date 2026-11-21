@@ -176,4 +176,9 @@ class ApiEndpoints {
   static const String markNotificationRead = '/notifications';
   static const String registerPushToken = '/notifications/register-token';
   static const String registerDeviceToken = '/notifications/register-token';
+
+  // App Releases & OTA Updates
+  static const String appReleaseCheck = '/app/releases/check';
+  static const String appReleaseLatest = '/app/releases/latest';
+  static const String appReleaseDownload = '/app/releases/download';
 }

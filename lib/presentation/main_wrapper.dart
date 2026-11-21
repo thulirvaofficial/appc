@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_colors.dart';
+import '../core/services/app_update_service.dart';
 import '../providers/current_tab_provider.dart';
 import '../providers/order_provider.dart';
 import 'categories/categories_screen.dart';
@@ -8,6 +9,7 @@ import 'home/home_screen.dart';
 import 'orders/my_orders_screen.dart';
 import 'profile/profile_screen.dart';
 import 'subscriptions/subscriptions_screen.dart';
+import 'widgets/app_update_dialog.dart';
 import 'widgets/side_menu_drawer.dart';
 
 class MainWrapper extends ConsumerStatefulWidget {
@@ -32,8 +34,20 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ref.read(currentTabProvider.notifier).state = _currentIndex;
+        _checkAppUpdate();
       }
     });
+  }
+
+  Future<void> _checkAppUpdate() async {
+    try {
+      final info = await ref.read(appUpdateProvider.notifier).checkForUpdate();
+      if (info != null && info.updateAvailable && mounted) {
+        AppUpdateDialog.show(context, info);
+      }
+    } catch (e) {
+      debugPrint('⚠️ [APP UPDATE] Startup check error: $e');
+    }
   }
 
   void _onTabTapped(int index) {

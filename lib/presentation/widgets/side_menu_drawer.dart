@@ -10,7 +10,9 @@ import '../profile/about_screen.dart';
 import '../subscriptions/subscriptions_screen.dart';
 import '../profile/addresses_screen.dart';
 import '../profile/offers_screen.dart';
+import '../../core/services/app_update_service.dart';
 import 'app_settings_dialog.dart';
+import 'app_update_dialog.dart';
 
 class SideMenuDrawer extends ConsumerWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -191,6 +193,31 @@ class SideMenuDrawer extends ConsumerWidget {
                     onTap: () {
                       Navigator.pop(context);
                       AppSettingsDialog.show(context);
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.system_update_outlined,
+                    title: 'Check for Updates',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      scaffoldMessenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Checking for Thulirva updates...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      final info = await ref.read(appUpdateProvider.notifier).checkForUpdate(manualCheck: true);
+                      if (info != null && info.updateAvailable && context.mounted) {
+                        AppUpdateDialog.show(context, info);
+                      } else if (context.mounted) {
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Thulirva is up to date (v${info?.currentVersion ?? "latest"}).'),
+                            backgroundColor: AppColors.forestGreen,
+                          ),
+                        );
+                      }
                     },
                   ),
                   const Divider(height: 16),
